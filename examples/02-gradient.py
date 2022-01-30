@@ -18,10 +18,8 @@ mf    = scf.RKS(mol)
 mf.xc = "b3lyp"
 mf.kernel()
 
-cavity_freq = [0.200]
-cavity_mode = [[0.001, 0.0, 0.0]]
-cavity_freq = numpy.asarray(cavity_freq)
-cavity_mode = numpy.asarray(cavity_mode)
+cavity_freq = numpy.asarray([0.2940])
+cavity_mode = numpy.asarray([[0.001, 0.0, 0.0]])
 
 # TDA-JC
 cav_model = qed.JC(mf, cavity_mode=cavity_mode, cavity_freq=cavity_freq)
@@ -30,4 +28,4 @@ td.nroots = 5
 td.kernel()
 
 grad = qed.Gradients(td)
-g    = grad.kernel(state=1) # 1 for S1 (0 for ground state)
+g    = grad.kernel(state=2) # 1 for S1 (0 for ground state)
