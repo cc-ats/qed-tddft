@@ -1,6 +1,6 @@
-# An Implementation of QED-TDDFT
+# Quantum-electrodynamical Time-dependent Density Functional Theory Within Gaussian Atomic Basis
 
-# Example
+## Example
 ```
 import numpy
 from pyscf import gto, scf, tdscf
@@ -32,7 +32,7 @@ td.nroots = 5
 td.kernel()
 ```
 
-# Please Cite
+## Please Cite
 
 [Quantum-electrodynamical time-dependent density functional theory within Gaussian atomic basis](https://aip.scitation.org/doi/full/10.1063/5.0057542),
 Junjie Yang, Qi Ou, Zheng Pei, Hua Wang, Binbin Weng, Zhigang Shuai, Kieran Mullen, and Yihan Shao, *J. Chem. Phys.*. **155**, 064107 (2021). doi:[10.1063/5.0057542](https://aip.scitation.org/doi/full/10.1063/5.0057542)
