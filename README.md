@@ -6,7 +6,7 @@ The PySCF program package can be installed with
 pip install pyscf
 ```
 
-To use QED-TDDFT,
+To use QED-TDDFT
 ```
 git clone git@github.com:cc-ats/qed-tddft.git
 export PYTHONPATH=$(pwd):$PYTHONPATH
