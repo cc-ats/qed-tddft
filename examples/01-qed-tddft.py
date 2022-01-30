@@ -21,9 +21,9 @@ mf.kernel()
 tda = tdscf.TDA(mf)
 tda.kernel()
 print("e = ", tda.e)
-tda.analyze()
+print(tda.transition_dipole())
 
-cavity_freq = numpy.asarray([0.200])
+cavity_freq = numpy.asarray([0.2946])
 cavity_mode = numpy.asarray([[0.001, 0.0, 0.0]])
 
 # TDDFT-PF
