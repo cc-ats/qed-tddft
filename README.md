@@ -1,5 +1,19 @@
 # Quantum-electrodynamical Time-dependent Density Functional Theory Within Gaussian Atomic Basis
 
+## Installation
+The PySCF program package can be installed with
+```
+pip install pyscf
+```
+
+To use QED-TDDFT,
+```
+git clone git@github.com:cc-ats/qed-tddft.git
+export PYTHONPATH=$(pwd):$PYTHONPATH
+cd examples
+python 01-qed-tddft.py 
+```
+
 ## Example
 ```
 import numpy
