@@ -18,6 +18,11 @@ mf    = scf.RKS(mol)
 mf.xc = "b3lyp"
 mf.kernel()
 
+tda = tdscf.TDA(mf)
+tda.kernel()
+print("e = ", tda.e)
+tda.analyze()
+
 cavity_freq = numpy.asarray([0.200])
 cavity_mode = numpy.asarray([[0.001, 0.0, 0.0]])
 
