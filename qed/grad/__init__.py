@@ -3,7 +3,8 @@ from pyscf.dft.rks import KohnShamDFT
 
 from qed.grad import tdrhf, tdrks
 
-def Gradients(td):
+# TODO: use `_is_dft_object(mf) = getattr(mf, 'xc', None) is not None and hasattr(mf, '_numint')`
+def Gradients(td): 
     scf_obj = td._scf
     assert isinstance(scf_obj, RHF)
 
