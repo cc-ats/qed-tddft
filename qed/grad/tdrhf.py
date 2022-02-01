@@ -238,8 +238,6 @@ def _qed_tdrhf_elec_grad(qed_td, x_y, m_n, singlet=True, atmlst=None,
         de_elec[k] -= numpy.einsum('xji,ij->x', vhf1[3,:,p0:p1], tran_den_xmy_ao[:,p0:p1]) * 2
         # print_rec(de[k, :].reshape(1,3), title="de[k] +179")
 
-    log.timer('TDHF nuclear gradients', *time0)
-
     de = de_elec + de_sx + de_dipx
     return de
 
@@ -265,7 +263,10 @@ def grad_elec(td_grad, xy, mn, singlet=True, atmlst=None,
     else:
         log.debug("QED-TDRHF Gradient No DSE\n")
     
-    return _qed_tdrhf_elec_grad(td, xy, mn, singlet=singlet, atmlst=atmlst, max_memory=max_memory, verbose=verbose)
+    tmp = _qed_tdrhf_elec_grad(td, xy, mn, singlet=singlet, atmlst=atmlst, max_memory=max_memory, verbose=verbose)
+    
+    log.timer('TDHF nuclear gradients', *time0)
+    return tmp
 
 class Gradients(tdrhf_grad.Gradients):
 

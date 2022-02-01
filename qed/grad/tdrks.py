@@ -271,12 +271,14 @@ def grad_elec(td_grad, xy, mn, singlet=True, atmlst=None,
     assert singlet
 
     if with_dse:
-        log.info("QED-tdrks Gradient With DSE\n")
+        log.info("QED-TDRKS Gradient With DSE\n")
     else:
-        log.info("QED-tdrks Gradient No DSE\n")
-    return _qed_tdrks_elec_grad(td, xy, mn, singlet=singlet, atmlst=atmlst, 
+        log.info("QED-TDRKS Gradient No DSE\n")
+    tmp = _qed_tdrks_elec_grad(td, xy, mn, singlet=singlet, atmlst=atmlst, 
                                 with_dse=with_dse, max_memory=max_memory, verbose=verbose)
-
+    
+    log.timer('TDKS nuclear gradients', *time0)
+    return tmp
 
 class Gradients(tdrks_grad.Gradients):
 

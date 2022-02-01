@@ -332,9 +332,12 @@ class TDASym(TDMixin):
         xs = amps[:, :self._nov]
         return xs, xs
 
-    def get_xys(self, amps):
+    def get_xys(self, amps, fac=None):
         xs, xs = self.get_amps(amps)
-        return [(x, 0) for x in xs]
+        if fac is None:
+            return [(x, 0) for x in xs]
+        else:
+            return [(x * fac, 0) for x in xs]
 
     def get_norms2(self, xys):
         amp_size = self._nov
@@ -407,13 +410,16 @@ class TDASym(TDMixin):
         nstates = self.e.size
         amps    = numpy.asarray(amps).reshape(nstates, -1)
 
-        zs, xys = self.get_amps(amps)
-        ls, mns = self.cav_obj.get_amps(amps)
-        norms2  = self.get_norms2(xys) + self.cav_obj.get_norms2(mns)
-        norms2  = norms2.reshape(nstates)
-        amps    = numpy.einsum("li,l->li", amps, 1/numpy.sqrt(norms2))
+        zs, xys     = self.get_amps(amps)
+        ls, mns     = self.cav_obj.get_amps(amps)
+        norms2_elec = self.get_norms2(xys) 
+        norms2_ph   = self.cav_obj.get_norms2(mns)
+        norms2      = (norms2_elec + norms2_ph).reshape(nstates)
+        amps        = numpy.einsum("li,l->li", amps, 1/numpy.sqrt(norms2))
+        log.info("norms2_elec = \n%s", norms2_elec)
+        log.info("norms2_elec = \n%s", norms2_ph)
         
-        self.xy = self.get_xys(amps)/numpy.sqrt(2)
+        self.xy = self.get_xys(amps, fac=1.0/numpy.sqrt(2)) # For alpha beta spin
         self.mn = self.cav_obj.get_mns(amps)
 
         if self.chkfile:
@@ -486,9 +492,14 @@ class RPA(TDANoSym):
         xs, ys = xys.transpose(1,0,2)
         return xs + ys, xys
 
-    def get_xys(self, amps):
+    def get_xys(self, amps, fac=None):
         zs, xys = self.get_amps(amps)
-        return [(x, y) for x, y in xys]
+
+        if fac is None:
+            return [(x, y) for x, y in xys]
+        else:
+            return [(x * fac, y * fac) for x, y in xys]
+
 
     def get_norms2(self, xys):
         amp_size = 2 * self._nov
