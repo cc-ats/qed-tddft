@@ -159,6 +159,7 @@ class TDMixin(lib.StreamObject):
         log = logger.new_logger(self, verbose)
         log.info('\n')
         log.info('******** %s from %s-%s-%s ********', self.__class__, self.td_obj.__class__, self.cav_obj.__class__, self._scf.__class__)
+        log.info("QED-TDDFT: %s", "Yang, et. al. J. Chem. Phys. 155, 064107 (2021) https://doi.org/10.1063/5.0057542")
 
         mf_obj    = self._scf
         assert isinstance(mf_obj, RHF)

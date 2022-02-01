@@ -291,6 +291,7 @@ class Gradients(tdrhf_grad.Gradients):
         log = logger.new_logger(self, verbose)
         log.info('\n')
         log.info('******** %s-%s ********', self.base.td_obj.__class__, self.base.cav_obj.__class__)
+        log.info("QED-TDDFT analytical gradient: %s", "Yang, et. al. https://doi.org/10.26434/chemrxiv-2021-lf5m2")
         log.info('cphf_conv_tol  = %g', self.cphf_conv_tol)
         log.info('cphf_max_cycle = %d', self.cphf_max_cycle)
         log.info('chkfile        = %s', self.chkfile)
