@@ -27,5 +27,5 @@ td        = qed.TDA(mf, cav_obj=cav_model)
 td.nroots = 5
 td.kernel()
 
-grad = qed.Gradients(td)
-g    = grad.kernel(state=2) # 1 for S1 (0 for ground state)
+grad = td.nuc_grad_method()
+g    = grad.kernel(state=2) # 2 for S2 (0 for ground state)

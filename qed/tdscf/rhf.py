@@ -276,6 +276,10 @@ class TDMixin(lib.StreamObject):
         )
         return x0
 
+    def nuc_grad_method(self):
+        from qed import grad
+        return grad.Gradients(self)
+
     def init_guess(self, mf_obj, nstates=None):
         raise NotImplementedError
 
@@ -416,8 +420,10 @@ class TDASym(TDMixin):
         norms2_ph   = self.cav_obj.get_norms2(mns)
         norms2      = (norms2_elec + norms2_ph).reshape(nstates)
         amps        = numpy.einsum("li,l->li", amps, 1/numpy.sqrt(norms2))
-        log.info("norms2_elec = \n%s", norms2_elec)
-        log.info("norms2_elec = \n%s", norms2_ph)
+
+        if self.verbose > 3:
+            for istate, xy in enumerate(xys):
+                log.info("istate = %4d, norms2_elec = % 6.4f, norms2_elec = % 6.4f", istate, norms2_elec[istate], norms2_ph[istate])
         
         self.xy = self.get_xys(amps, fac=1.0/numpy.sqrt(2)) # For alpha beta spin
         self.mn = self.cav_obj.get_mns(amps)

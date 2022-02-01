@@ -5,7 +5,7 @@ import qed
 from   qed.tdscf.rhf  import TDASym, TDANoSym
 from   qed.cavity.rhf import RotatingWaveApproximation
 
-from   qed.grad       import tdrhf, tdrks
+from   qed.grad       import Gradients
 
 def JC(mf, cavity_mode=None, cavity_freq=None):
     if isinstance(mf, scf.uhf.UHF):
@@ -61,7 +61,3 @@ def RPA(mf_obj, cav_obj=None):
         return qed.tdscf.rhf.RPA(td_obj, cav_obj)
 
 TDDFT = RPA
-
-def Gradients(td):
-    assert isinstance(td, qed.tdscf.rhf.TDMixin)
-    return qed.grad.tdrks.Gradients(td)

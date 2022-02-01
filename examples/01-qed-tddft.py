@@ -4,7 +4,7 @@ from pyscf import gto, scf, tdscf
 import qed
 
 mol         = gto.Mole()
-mol.verbose = 3
+mol.verbose = 5
 mol.atom    = '''
 H       -0.9450370725    -0.0000000000     1.1283908757
 C       -0.0000000000     0.0000000000     0.5267587663
