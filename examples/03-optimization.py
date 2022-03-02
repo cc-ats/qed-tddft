@@ -31,6 +31,7 @@ grad = td.nuc_grad_method()
 g    = grad.kernel(state=2) # 2 for S2 (0 for ground state)
 
 # TODO: rewrite `as_scanner` and `reset`
+# Make sure the optimizer is not using hessian anyway
 # Package dependencies are: 
 # NetworkX:  https://github.com/networkx/networkx
 # geomeTRIC: https://github.com/leeping/geomeTRIC

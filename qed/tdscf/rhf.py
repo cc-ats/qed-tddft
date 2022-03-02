@@ -132,8 +132,8 @@ def as_scanner(td):
             self._scf = td._scf.as_scanner()
 
         # TODO: read reset in lib.SinglePointScanner
-        # def reset(self, mol):
-        #     pass
+        def reset(self, mol):
+            raise NotImplementedError
 
         def __call__(self, mol_or_geom, **kwargs):
             if isinstance(mol_or_geom, gto.Mole):
