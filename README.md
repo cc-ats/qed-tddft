@@ -8,7 +8,9 @@ pip install pyscf
 
 To use QED-TDDFT
 ```
-git clone git@github.com:cc-ats/qed-tddft.git
+export QED_TDDFT_DIR_NAME=qed-tddft
+git clone git@github.com:cc-ats/qed-tddft.git $QED_TDDFT_DIR_NAME
+cd $QED_TDDFT_DIR_NAME
 export PYTHONPATH=$(pwd):$PYTHONPATH
 cd examples
 python 01-qed-tddft.py 
