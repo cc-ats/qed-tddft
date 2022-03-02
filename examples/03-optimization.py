@@ -30,5 +30,9 @@ td.kernel()
 grad = td.nuc_grad_method()
 g    = grad.kernel(state=2) # 2 for S2 (0 for ground state)
 
+# TODO: rewrite `as_scanner` and `reset`
+# Package dependencies are: 
+# NetworkX:  https://github.com/networkx/networkx
+# geomeTRIC: https://github.com/leeping/geomeTRIC
 grad_scanner = grad.as_scanner(state=2)
 mol1         = grad_scanner.optimizer().kernel()
