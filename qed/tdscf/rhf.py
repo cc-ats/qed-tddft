@@ -6,6 +6,7 @@
 import numpy
 
 import pyscf
+from pyscf        import gto
 from pyscf        import lib
 from pyscf.scf.hf import RHF
 from pyscf.lib    import logger
@@ -105,6 +106,49 @@ def get_ab_block(td_obj):
 
 def get_omega_block(cav_obj):
     return numpy.diag(cav_obj.cavity_freq).reshape(cav_obj.cavity_num, cav_obj.cavity_num)
+
+
+def as_scanner(td):
+    '''Generating a scanner/solver for QED-TDA/TDHF/TDDFT PES.
+    The returned solver is a function. This function requires one argument
+    "mol" as input and returns total TDA/TDHF/TDDFT energy.
+    The solver will automatically use the results of last calculation as the
+    initial guess of the new calculation.  All parameters assigned in the
+    TDA/TDDFT and the underlying SCF objects (conv_tol, max_memory etc) are
+    automatically applied in the solver.
+    Note scanner has side effects.  It may change many underlying objects
+    (_scf, with_df, with_x2c, ...) during calculation.
+    '''
+
+    if isinstance(td, lib.SinglePointScanner):
+        return td
+
+    logger.info(td, 'Set %s as a scanner', td.__class__)
+
+    class TD_Scanner(td.__class__, lib.SinglePointScanner):
+        def __init__(self, td):
+            self.__dict__.update(td.__dict__)
+
+            self._scf = td._scf.as_scanner()
+
+        # TODO: read reset in lib.SinglePointScanner
+        # def reset(self, mol):
+        #     pass
+
+        def __call__(self, mol_or_geom, **kwargs):
+            if isinstance(mol_or_geom, gto.Mole):
+                mol = mol_or_geom
+            else:
+                mol = self.mol.set_geom_(mol_or_geom, inplace=False)
+
+            self.reset(mol)
+
+            mf_scanner = self._scf
+            mf_e = mf_scanner(mol)
+            self.kernel(**kwargs)
+            return mf_e + self.e
+            
+    return TD_Scanner(td)
 
 class TDMixin(lib.StreamObject):
     conv_tol    = getattr(__config__, 'tdscf_rhf_TDA_conv_tol',  1e-9)
@@ -254,6 +298,7 @@ class TDMixin(lib.StreamObject):
     oscillator_strength = oscillator_strength
     _contract_multipole = _contract_multipole  # needed by following methods
     transition_dipole   = transition_dipole
+    as_scanner          = as_scanner
 
     def gen_vind(self, cav_obj=None):
         if cav_obj is None:
