@@ -128,12 +128,7 @@ def as_scanner(td):
     class TD_Scanner(td.__class__, lib.SinglePointScanner):
         def __init__(self, td):
             self.__dict__.update(td.__dict__)
-
             self._scf = td._scf.as_scanner()
-
-        # TODO: read reset in lib.SinglePointScanner
-        def reset(self, mol):
-            raise NotImplementedError
 
         def __call__(self, mol_or_geom, **kwargs):
             if isinstance(mol_or_geom, gto.Mole):
@@ -145,6 +140,7 @@ def as_scanner(td):
 
             mf_scanner = self._scf
             mf_e = mf_scanner(mol)
+
             self.kernel(**kwargs)
             return mf_e + self.e
             
@@ -252,7 +248,11 @@ class TDMixin(lib.StreamObject):
     def reset(self, mol=None):
         if mol is not None:
             self.mol = mol
+        
         self._scf.reset(mol)
+        self.td_obj.reset(mol)
+        self.cav_obj.reset(mol)
+
         return self
 
     def get_ab_block(self, td_obj=None):

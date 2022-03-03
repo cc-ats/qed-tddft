@@ -37,6 +37,14 @@ class CavityModel(lib.StreamObject):
             self.cavity_mode = None
             self.cavity_num  = 0
 
+    def reset(self, mol=None):
+        if mol is not None:
+            self._mol = mol
+        
+        self.dip_ov      = None
+
+        return self
+
     def check_sanity(self):
         assert self._scf.converged
         assert isinstance(self.cavity_num, int)
