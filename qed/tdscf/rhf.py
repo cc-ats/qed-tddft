@@ -128,7 +128,8 @@ def as_scanner(td):
     class TD_Scanner(td.__class__, lib.SinglePointScanner):
         def __init__(self, td):
             self.__dict__.update(td.__dict__)
-            self._scf = td._scf.as_scanner()
+            self._scf   = td._scf.as_scanner()
+            self.td_obj = td.td_obj.as_scanner()
 
         def __call__(self, mol_or_geom, **kwargs):
             if isinstance(mol_or_geom, gto.Mole):
@@ -141,7 +142,16 @@ def as_scanner(td):
             mf_scanner = self._scf
             mf_e = mf_scanner(mol)
 
+            self.td_obj.reset(mol)
+
+            cavity_freq = self.cav_obj.cavity_freq
+            cavity_mode = self.cav_obj.cavity_mode
+            self.cav_obj = self.cav_obj.__class__(
+                mf_scanner, cavity_mode, cavity_freq
+            )
+
             self.kernel(**kwargs)
+
             return mf_e + self.e
             
     return TD_Scanner(td)
@@ -155,17 +165,17 @@ class TDMixin(lib.StreamObject):
     max_space   = getattr(__config__, 'tdscf_rhf_TDA_max_space',   50)
     max_cycle   = getattr(__config__, 'tdscf_rhf_TDA_max_cycle',  100)
 
-    def __init__(self, tdobj, cav_obj):
-        self.td_obj     = tdobj
+    def __init__(self, td_obj, cav_obj):
+        self.td_obj     = td_obj
         self._nov       = None
         self.cav_obj    = cav_obj
 
-        self.verbose    = tdobj.verbose
-        self.stdout     = tdobj.stdout
-        self.mol        = tdobj.mol
-        self._scf       = tdobj._scf
-        self.max_memory = tdobj.max_memory
-        self.chkfile    = tdobj.chkfile
+        self.verbose    = td_obj.verbose
+        self.stdout     = td_obj.stdout
+        self.mol        = td_obj.mol
+        self._scf       = td_obj._scf
+        self.max_memory = td_obj.max_memory
+        self.chkfile    = td_obj.chkfile
         self.wfnsym     = None
 
         # xy[i] = (X_I,Y_I), In TDA, Y_I = 0
@@ -248,10 +258,6 @@ class TDMixin(lib.StreamObject):
     def reset(self, mol=None):
         if mol is not None:
             self.mol = mol
-        
-        self._scf.reset(mol)
-        self.td_obj.reset(mol)
-        self.cav_obj.reset(mol)
 
         return self
 
@@ -428,6 +434,8 @@ class TDASym(TDMixin):
         td_obj  = self.td_obj
         cav_obj = self.cav_obj
         cav_obj.build()
+
+        # print("cav_obj = ", cav_obj.dip_ov)
         cpu0 = (logger.process_clock(), logger.perf_counter())
         self.check_sanity()
         self.dump_flags()

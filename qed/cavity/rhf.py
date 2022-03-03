@@ -37,11 +37,15 @@ class CavityModel(lib.StreamObject):
             self.cavity_mode = None
             self.cavity_num  = 0
 
-    def reset(self, mol=None):
+    def reset(self, mol=None, mo_coeff = None):
         if mol is not None:
             self._mol = mol
-        
-        self.dip_ov      = None
+
+        if mo_coeff is not None:
+            self._scf.mo_coeff = mo_coeff
+
+        self._scf.reset(mol)
+        self.dip_ov = None
 
         return self
 
@@ -85,6 +89,7 @@ class RestrictedCavityModel(CavityModel):
         assert isinstance(mf_obj, RHF)
 
         mo_coeff = mf_obj.mo_coeff
+        print("mo_coeff = ", mo_coeff)
         assert mo_coeff.dtype == numpy.double
 
         mo_occ    = mf_obj.mo_occ

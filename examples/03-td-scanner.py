@@ -42,17 +42,14 @@ td          = qed.TDA(mf, cav_obj=cav_model)
 td.nroots   = 5
 td.kernel()
 
-grad = td.nuc_grad_method()
-grad.verbose = 3
-g    = grad.kernel(state=1)
-grad_scanner = grad.as_scanner(state=1)
-e1, g1 = grad_scanner(xyz2)
-print("e1 = ", e1)
+td_scanner = td.as_scanner()
+e          = td_scanner(xyz2)
+print("e1 = ", e)
 
 mol         = gto.Mole()
 mol.verbose = 0
 mol.atom    = xyz2
-mol.basis = '6-311++g**'
+mol.basis   = '6-311++g**'
 mol.build()
 
 mf         = scf.RKS(mol)
@@ -67,22 +64,7 @@ cav_model   = qed.JC(mf, cavity_mode=cavity_mode, cavity_freq=cavity_freq)
 td          = qed.TDA(mf, cav_obj=cav_model)
 td.nroots   = 5
 td.kernel()
-print("e2 = ", td.e[0] + mf.energy_tot())
-
-grad = td.nuc_grad_method()
-grad.verbose = 3
-g2   = grad.kernel(state=1)
+print("e2 = ", mf.energy_tot())
+print("e2 = ", mf.energy_tot() + td.e)
 
 assert 1 == 2
-
-grad_scanner = grad.as_scanner(state=1)
-mol1         = grad_scanner.optimizer().kernel()
-coords = mol1.atom_coords(unit='Angstrom')
-r1     = numpy.linalg.norm(coords[0, :] - coords[1, :])
-
-grad_scanner = grad.as_scanner(state=2)
-mol2         = grad_scanner.optimizer().kernel()
-coords = mol2.atom_coords(unit='Angstrom')
-r2     = numpy.linalg.norm(coords[0, :] - coords[1, :])
-
-print(f"r1 = {r1:6.4f}, r2 = {r2:6.4f}")

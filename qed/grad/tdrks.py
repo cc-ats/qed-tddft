@@ -3,18 +3,12 @@ import numpy
 from pyscf import lib, scf, dft
 from pyscf.lib import logger
 from pyscf.grad.tdrks import _contract_xc_kernel
-#from pyscf.grad import rhf as rhf_grad
-#from pyscf.grad import rks as rks_grad
-#from pyscf.grad import tdrhf as tdrhf_grad
 from pyscf.grad import tdrks as tdrks_grad
 from pyscf.scf import cphf
 from pyscf import __config__
 
-
 import qed
-from qed.grad       import tdrhf
-from qed.cavity.rhf import Rabi
-
+from qed.grad.tdrhf import as_scanner
 
 def _qed_tdrks_elec_grad(qed_td, x_y, m_n, singlet=True, atmlst=None,
                          with_dse=True, max_memory=2000, verbose=logger.INFO):
@@ -142,7 +136,6 @@ def _qed_tdrks_elec_grad(qed_td, x_y, m_n, singlet=True, atmlst=None,
 
     lag_vo *= 2
     # finished Lagrangian, solve z-vector
-
 
     # set singlet=None, generate function for CPHF type response kernel
     vresp = mf.gen_response(singlet=None, hermi=1)
@@ -298,6 +291,8 @@ class Gradients(tdrks_grad.Gradients):
         self.de         = None
         keys = set(('cphf_max_cycle', 'cphf_conv_tol'))
         self._keys = set(self.__dict__.keys()).union(keys)
+
+    as_scanner = as_scanner
 
     def dump_flags(self, verbose=None):
         log = logger.new_logger(self, verbose)

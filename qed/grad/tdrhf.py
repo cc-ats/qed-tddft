@@ -268,6 +268,51 @@ def grad_elec(td_grad, xy, mn, singlet=True, atmlst=None,
     log.timer('TDHF nuclear gradients', *time0)
     return tmp
 
+def as_scanner(td_grad, state=1):
+    '''Generating a nuclear gradients scanner/solver (for geometry optimizer).
+    The returned solver is a function. This function requires one argument
+    "mol" as input and returns energy and first order nuclear derivatives.
+    The solver will automatically use the results of last calculation as the
+    initial guess of the new calculation.  All parameters assigned in the
+    nuc-grad object and SCF object (DIIS, conv_tol, max_memory etc) are
+    automatically applied in the solver.
+    '''
+
+    from pyscf import gto
+    if isinstance(td_grad, lib.GradScanner):
+        return td_grad
+
+    logger.info(td_grad, 'Create scanner for %s', td_grad.__class__)
+
+    class TDSCF_GradScanner(td_grad.__class__, lib.GradScanner):
+        def __init__(self, g):
+            lib.GradScanner.__init__(self, g)
+            self._keys = self._keys.union(['e_tot'])
+
+        def __call__(self, mol_or_geom, state=state, **kwargs):
+            if isinstance(mol_or_geom, gto.Mole):
+                mol = mol_or_geom
+            else:
+                mol = self.mol.set_geom_(mol_or_geom, inplace=False)
+            
+            mf_scanner = self.base._scf
+            mf_e = mf_scanner(mol)
+            
+            de = self.kernel(state=state, **kwargs)
+            e_tot = self.e_tot[state-1]
+            return e_tot, de
+            
+        @property
+        def converged(self):
+            td_scanner = self.base
+            return all((td_scanner._scf.converged,
+                        td_scanner.converged[self.state]))
+
+    if state == 0:
+        return td_grad.base._scf.nuc_grad_method().as_scanner()
+    else:
+        return TDSCF_GradScanner(td_grad)
+
 class Gradients(tdrhf_grad.Gradients):
 
     cphf_max_cycle = getattr(__config__, 'grad_tdrhf_Gradients_cphf_max_cycle', 20)
@@ -286,6 +331,8 @@ class Gradients(tdrhf_grad.Gradients):
         self.de         = None
         keys = set(('cphf_max_cycle', 'cphf_conv_tol'))
         self._keys = set(self.__dict__.keys()).union(keys)
+
+    as_scanner = as_scanner
 
     def dump_flags(self, verbose=None):
         log = logger.new_logger(self, verbose)
