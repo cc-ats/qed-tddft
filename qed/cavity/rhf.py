@@ -89,7 +89,6 @@ class RestrictedCavityModel(CavityModel):
         assert isinstance(mf_obj, RHF)
 
         mo_coeff = mf_obj.mo_coeff
-        print("mo_coeff = ", mo_coeff)
         assert mo_coeff.dtype == numpy.double
 
         mo_occ    = mf_obj.mo_occ

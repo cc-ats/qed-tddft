@@ -42,9 +42,11 @@ td          = qed.TDA(mf, cav_obj=cav_model)
 td.nroots   = 5
 td.kernel()
 
-td_scanner = td.as_scanner()
-e          = td_scanner(xyz2)
-print("e1 = ", e)
+grad = td.nuc_grad_method()
+grad.verbose = 3
+g    = grad.kernel(state=1)
+grad_scanner = grad.as_scanner(state=1)
+e1, g1 = grad_scanner(xyz2)
 
 mol         = gto.Mole()
 mol.verbose = 0
@@ -64,7 +66,9 @@ cav_model   = qed.JC(mf, cavity_mode=cavity_mode, cavity_freq=cavity_freq)
 td          = qed.TDA(mf, cav_obj=cav_model)
 td.nroots   = 5
 td.kernel()
-print("e2 = ", mf.energy_tot())
-print("e2 = ", mf.energy_tot() + td.e)
+
+grad = td.nuc_grad_method()
+grad.verbose = 3
+g2   = grad.kernel(state=1)
 
 assert 1 == 2

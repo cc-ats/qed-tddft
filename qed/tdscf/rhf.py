@@ -129,7 +129,6 @@ def as_scanner(td):
         def __init__(self, td):
             self.__dict__.update(td.__dict__)
             self._scf   = td._scf.as_scanner()
-            self.td_obj = td.td_obj.as_scanner()
 
         def __call__(self, mol_or_geom, **kwargs):
             if isinstance(mol_or_geom, gto.Mole):
@@ -140,12 +139,12 @@ def as_scanner(td):
             self.reset(mol)
 
             mf_scanner = self._scf
-            mf_e = mf_scanner(mol)
+            mf_e       = mf_scanner(mol)
 
-            self.td_obj.reset(mol)
+            self.td_obj = self.td_obj.__class__(mf_scanner)
 
-            cavity_freq = self.cav_obj.cavity_freq
-            cavity_mode = self.cav_obj.cavity_mode
+            cavity_mode  = self.cav_obj.cavity_mode
+            cavity_freq  = self.cav_obj.cavity_freq
             self.cav_obj = self.cav_obj.__class__(
                 mf_scanner, cavity_mode, cavity_freq
             )

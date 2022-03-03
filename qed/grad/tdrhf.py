@@ -277,7 +277,6 @@ def as_scanner(td_grad, state=1):
     nuc-grad object and SCF object (DIIS, conv_tol, max_memory etc) are
     automatically applied in the solver.
     '''
-
     from pyscf import gto
     if isinstance(td_grad, lib.GradScanner):
         return td_grad
@@ -294,14 +293,16 @@ def as_scanner(td_grad, state=1):
                 mol = mol_or_geom
             else:
                 mol = self.mol.set_geom_(mol_or_geom, inplace=False)
+
+            td_scanner = self.base
+            td_scanner(mol)
             
-            mf_scanner = self.base._scf
-            mf_e = mf_scanner(mol)
-            
+            self.mol = mol
+# TODO: Check root flip.  Maybe avoid the initial guess in TDHF otherwise
+# large error may be found in the excited states amplitudes
             de = self.kernel(state=state, **kwargs)
             e_tot = self.e_tot[state-1]
             return e_tot, de
-            
         @property
         def converged(self):
             td_scanner = self.base
