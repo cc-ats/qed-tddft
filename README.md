@@ -48,10 +48,13 @@ td.nroots = 5
 td.kernel()
 ```
 
-## Please Cite
+## References
 
 [Quantum-electrodynamical time-dependent density functional theory within Gaussian atomic basis](https://aip.scitation.org/doi/full/10.1063/5.0057542),
 Junjie Yang, Qi Ou, Zheng Pei, Hua Wang, Binbin Weng, Zhigang Shuai, Kieran Mullen, and Yihan Shao, *J. Chem. Phys.*. **155**, 064107 (2021). doi:[10.1063/5.0057542](https://aip.scitation.org/doi/full/10.1063/5.0057542)
+
+[Cavity quantum-electrodynamical time-dependent density functional theory within Gaussian atomic basis. II. Analytic energy gradient](https://aip.scitation.org/doi/full/10.1063/5.0082386),
+Junjie Yang, Zheng Pei, Erick Calderon Leon, Carly Wickizer, Binbin Weng, Yuezhi Mao, Qi Ou, and Yihan Shao, *J. Chem. Phys.*. **156**, 124104 (2022). doi:[10.1063/5.0082386](https://aip.scitation.org/doi/full/10.1063/5.0082386)
 
 The following paper should also be cited in publications utilizing the PySCF program package:
 
