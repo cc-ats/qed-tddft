@@ -182,7 +182,7 @@ class TDMixin(lib.StreamObject):
         else:
             log.info("%d cavity mode in the calculation:", self.cav_obj.cavity_num)
             for alpha in range(self.cav_obj.cavity_num):
-                log.info("Cavity %d: freq = %4.2f, mode = (%4.2f, %4.2f, %4.2f)",
+                log.info("Cavity %d: freq = %6.4f, mode = (%6.4f, %6.4f, %6.4f)",
                 alpha+1, self.cav_obj.cavity_freq[alpha],
                 self.cav_obj.cavity_mode[0, alpha], self.cav_obj.cavity_mode[1, alpha], self.cav_obj.cavity_mode[2, alpha]
                 )
