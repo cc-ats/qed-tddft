@@ -434,7 +434,8 @@ class TDASym(TDMixin):
 
         self.xy = []
         for x, y in xys:
-            if y == 0:
+            if isinstance(y, int):
+                assert y == 0
                 self.xy.append((x.reshape(nocc, nvir), 0))
             else:
                 self.xy.append((x.reshape(nocc, nvir), y.reshape(nocc, nvir)))
