@@ -159,7 +159,8 @@ class TDMixin(lib.StreamObject):
         log = logger.new_logger(self, verbose)
         log.info('\n')
         log.info('******** %s from %s-%s-%s ********', self.__class__, self.td_obj.__class__, self.cav_obj.__class__, self._scf.__class__)
-        log.info("QED-TDDFT: %s", "Yang, et. al. J. Chem. Phys. 155, 064107 (2021) https://doi.org/10.1063/5.0057542")
+        log.info("cQED-TDDFT:          %s", "Yang, et. al. J. Chem. Phys. 155, 064107 (2021) https://doi.org/10.1063/5.0057542")
+        log.info("Analytical Gradient: %s", "Yang, et. al. J. Chem. Phys. 156, 124104 (2022) https://doi.org/10.1063/5.0082386")
 
         mf_obj    = self._scf
         assert isinstance(mf_obj, RHF)
