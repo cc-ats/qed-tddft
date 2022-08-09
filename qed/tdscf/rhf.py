@@ -424,9 +424,21 @@ class TDASym(TDMixin):
 
         if self.verbose > 3:
             for istate, xy in enumerate(xys):
-                log.info("istate = %4d, norms2_elec = % 6.4f, norms2_elec = % 6.4f", istate, norms2_elec[istate], norms2_ph[istate])
+                log.info("istate = %4d, norms2_elec = % 6.4f, norms2_ph = % 6.4f", istate, norms2_elec[istate], norms2_ph[istate])
         
-        self.xy = self.get_xys(amps, fac=1.0/numpy.sqrt(2)) # For alpha beta spin
+        mo_occ  = self._scf.mo_occ
+        nocc    = sum(mo_occ==2)
+        nvir    = sum(mo_occ==0)
+
+        xys = self.get_xys(amps, fac=1.0/numpy.sqrt(2)) # For alpha beta spin
+
+        self.xy = []
+        for x, y in xys:
+            if y == 0:
+                self.xy.append((x.reshape(nocc, nvir), 0))
+            else:
+                self.xy.append((x.reshape(nocc, nvir), y.reshape(nocc, nvir)))
+
         self.mn = self.cav_obj.get_mns(amps)
 
         if self.chkfile:
