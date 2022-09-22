@@ -1,0 +1,24 @@
+$molecule
+0 1
+ H    0.5397736    0.7493682    0.0000000
+ O   -0.0185014    0.0000000    0.0000000
+ H    0.5397736   -0.7493682    0.0000000
+$end
+
+$rem
+method  hf
+basis   3-21g
+verbose 0
+cis_n_roots 5
+!rpa     2
+thresh   14 !3
+scf_convergence 8 ! 6
+$end
+
+$polariton
+cavity_mode   0.0 0.0 0.01
+!cavity_freq  0.25
+cavity_model  jc rwa
+uniform_field 1
+!rpa     2
+$end

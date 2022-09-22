@@ -17,7 +17,8 @@ from pyscf.lib import davidson1, davidson_nosym1
 from pyscf.tdscf.rhf import get_ab
 from pyscf.tdscf.rhf import get_nto, oscillator_strength
 from pyscf.tdscf.rhf import _contract_multipole
-from pyscf.tdscf.rhf import transition_dipole              
+from pyscf.tdscf.rhf import transition_dipole
+from qed.tdscf.dipole_field_coupling import dipole_dot_efield_on_grid
 
 OUTPUT_THRESHOLD      = getattr(__config__, 'tdscf_rhf_get_nto_threshold',             0.3)
 REAL_EIG_THRESHOLD    = getattr(__config__, 'tdscf_rhf_TDDFT_pick_eig_threshold',     1e-4)
@@ -26,7 +27,7 @@ MO_BASE               = getattr(__config__, 'MO_BASE',                          
 POSTIVE_EIG_THRESHOLD = getattr(__config__, 'tdscf_rhf_TDDFT_positive_eig_threshold', 1e-3)
 
 # What I need? td_obj.get_norms2(xys), cav_obj.get_norms2(mns)
-# In the eigen part 
+# In the eigen part
 
 def get_qed_tdscf_operation(td_obj, cav_obj):
     get_elec_resp, elec_hdiag = td_obj.gen_elec_resp()
@@ -35,20 +36,20 @@ def get_qed_tdscf_operation(td_obj, cav_obj):
 
     hdiag    = numpy.hstack((elec_hdiag.ravel(), ph_hdiag.ravel()))
     amp_size = hdiag.size
-    
+
     get_elec_amps = td_obj.get_amps
     get_ph_amps   = cav_obj.get_amps
 
     def vind(amps):
         amps     = numpy.asarray(amps).reshape(-1, amp_size)
         num_amps = amps.shape[0]
-        zs, xys  = get_elec_amps(amps)  # TDA: zs = xs; RPA: zs = xs + ys 
+        zs, xys  = get_elec_amps(amps)  # TDA: zs = xs; RPA: zs = xs + ys
         ls, mns  = get_ph_amps(amps)    # RWA: ls = ms; PF:  ls = ms + ns
 
-        dse_resp    = get_dse_resp(zs) # give dse_resp = None for JC and Rabi 
+        dse_resp    = get_dse_resp(zs) # give dse_resp = None for JC and Rabi
         elec_resp   = get_elec_resp(xys, ls, dse_resp=dse_resp)
         ph_resp     = get_ph_resp(zs, mns)
-        
+
         tot_resp    = numpy.hstack((elec_resp.reshape(num_amps,-1), ph_resp.reshape(num_amps,-1)))
         return tot_resp.reshape(num_amps, amp_size)
 
@@ -70,14 +71,14 @@ def get_g_block(td_obj, cav_obj):
 
     cav_omegas = cav_obj.cavity_freq
     cav_lams   = cav_obj.cavity_mode
-    cav_nums   = cav_obj.cavity_num 
+    cav_nums   = cav_obj.cavity_num
 
-    dip_ov    = lib.einsum('xmn,mi,na->xia', dip_ao, orbo.conj(), orbv)
-    g_block   = lib.einsum('xia,xp->pia', dip_ov, cav_lams)
+    dip_dot_efield = dipole_dot_efield_on_grid(mol, mf_obj, cav_obj)
+    g_block   = lib.einsum('pmn,mi,na->pia', dip_dot_efield, orbo.conj(), orbv)
     g_block   = lib.einsum('p,pia->pia', numpy.sqrt(cav_omegas), g_block)
 
     return g_block.reshape(cav_nums, nocc, nvir)
-    
+
 def get_dse_block(td_obj, cav_obj):
     mol       = td_obj.mol
     mf_obj    = td_obj._scf
@@ -94,8 +95,8 @@ def get_dse_block(td_obj, cav_obj):
 
     cav_lams   = cav_obj.cavity_mode
 
-    dip_ov    = lib.einsum('xmn,mi,na->xia', dip_ao, orbo.conj(), orbv)
-    dse_block = lib.einsum('xia,xp->pia', dip_ov, cav_lams)
+    dip_dot_efield = dipole_dot_efield_on_grid(mol, mf_obj, cav_obj)
+    dse_block = lib.einsum('pmn,mi,na->pia', dip_dot_efield, orbo.conj(), orbv)
     dse_block = lib.einsum('pia,pjb->iajb', dse_block, dse_block)
 
     return 2*dse_block.reshape(nocc, nvir, nocc, nvir)
@@ -260,7 +261,7 @@ class TDMixin(lib.StreamObject):
         if cav_obj is None:
             cav_obj = self.cav_obj
         return get_qed_tdscf_operation(self, cav_obj)
-    
+
     def gen_eigen_solver(self):
         raise NotImplementedError
 
@@ -315,7 +316,7 @@ class TDASym(TDMixin):
         td_obj.wfnsym  = self.wfnsym
         amp_size       = self._nov
 
-        dip_ov      = cav_obj.dip_ov
+        ge_ov       = cav_obj.ge_ov
         cavity_mode = cav_obj.cavity_mode
         cavity_freq = cav_obj.cavity_freq
 
@@ -325,8 +326,7 @@ class TDASym(TDMixin):
             amp_num = xs.shape[0]
             axs     = vind0(xs)
             tmp1    = numpy.einsum("lp,p->lp", ls, numpy.sqrt(cavity_freq))
-            tmp2    = numpy.einsum("lp,xp->lx", tmp1, cavity_mode)
-            gls     = numpy.einsum("xia,lx->lia", dip_ov, tmp2).reshape(amp_num, amp_size)
+            gls     = numpy.einsum("pia,lp->lia", ge_ov, tmp1).reshape(amp_num, amp_size)
             if dse_resp is None:
                 return (axs + gls).reshape(amp_num, amp_size)
             else:
@@ -395,7 +395,7 @@ class TDASym(TDMixin):
 
         vind, hdiag              = self.gen_vind(cav_obj=cav_obj)
         precond                  = self.gen_precond(hdiag)
-        davidson_solver, pickeig = self.gen_eigen_solver() 
+        davidson_solver, pickeig = self.gen_eigen_solver()
 
         if amp0 is None:
             amp0 = self.get_init_guess(nstates=nstates)
@@ -408,7 +408,7 @@ class TDASym(TDMixin):
                               max_space=self.max_space, pick=pickeig,
                               verbose=log
                               )
-        
+
         # 1/sqrt(2) because self.x is for alpha excitation amplitude and 2(X^+*X) = 1
         self.converged = converged[:nstates]
         self.e         = e[:nstates]
@@ -418,7 +418,7 @@ class TDASym(TDMixin):
 
         zs, xys     = self.get_amps(amps)
         ls, mns     = self.cav_obj.get_amps(amps)
-        norms2_elec = self.get_norms2(xys) 
+        norms2_elec = self.get_norms2(xys)
         norms2_ph   = self.cav_obj.get_norms2(mns)
         norms2      = (norms2_elec + norms2_ph).reshape(nstates)
         amps        = numpy.einsum("li,l->li", amps, 1/numpy.sqrt(norms2))
@@ -426,7 +426,7 @@ class TDASym(TDMixin):
         if self.verbose > 3:
             for istate, xy in enumerate(xys):
                 log.info("istate = %4d, norms2_elec = % 6.4f, norms2_ph = % 6.4f", istate, norms2_elec[istate], norms2_ph[istate])
-        
+
         mo_occ  = self._scf.mo_occ
         nocc    = sum(mo_occ==2)
         nvir    = sum(mo_occ==0)
@@ -476,9 +476,9 @@ class RPA(TDANoSym):
         td_obj.wfnsym  = self.wfnsym
         amp_size       = 2 * self._nov
 
-        dip_ov = cav_obj.dip_ov
-        nocc   = dip_ov.shape[1]
-        nvir   = dip_ov.shape[2]
+        ge_ov  = cav_obj.ge_ov
+        nocc   = ge_ov.shape[1]
+        nvir   = ge_ov.shape[2]
         cavity_mode = cav_obj.cavity_mode
         cavity_freq = cav_obj.cavity_freq
 
@@ -494,8 +494,7 @@ class RPA(TDANoSym):
             abxys2  = abxys2.reshape(amp_num, nocc, nvir)
 
             tmp1 = numpy.einsum("lp,p->lp", ls, numpy.sqrt(cavity_freq))
-            tmp2 = numpy.einsum("lp,xp->lx", tmp1, cavity_mode)
-            gls  = numpy.einsum("xia,lx->lia", dip_ov, tmp2).reshape(amp_num, nocc, nvir)
+            gls  = numpy.einsum("pia,px->lia", ge_ov, tmp2).reshape(amp_num, nocc, nvir)
 
             abxys1 = (abxys1 + gls)
             abxys2 = (abxys2 - gls)
