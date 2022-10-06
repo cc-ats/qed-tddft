@@ -32,7 +32,8 @@ def creat_mesh_grids(mol, mf, grid_type=1, nxyz=[80, 80, 80, 0.1, 6.0]):
     return ngrids, coords, weights
 
 
-def get_electric_field(file_name='efield', strength=1, unit='nm', nline=2, time=0):
+def get_electric_field(file_name='efield', strength=1, unit='nm', nline=2):
+    from pyscf.data import nist
     # read in efield on cubic grids
     data = np.loadtxt(file_name+'.txt', skiprows=nline) # skip the header lines
 
@@ -42,15 +43,19 @@ def get_electric_field(file_name='efield', strength=1, unit='nm', nline=2, time=
 
     efield = data[:, 3:8:2] # we can only handle real field now
     if time > 0: # calculate efield at time t
-        efield += data[:, 4:9:2] * 1j
+        efield = efield + data[:, 4:9:2] * 1j
 
-        line = next(open(file_name, 'r'))
-        omega = float(line.split('lambda=')[1].split('nm')[0])
-        efield *= np.exp(1j*omega*time)
+        line = next(open(file_name+'.txt', 'r'))
+        f_lambda = float(line.split('lambda=')[1].split('nm')[0])
+        # E = hc/\lambda; 1fs = 41.341374575751 au
+        #print(1e7/nist.HARTREE2WAVENUMBER/f_lambda, time /(nist.HBAR/nist.HARTREE2J*1e15) )
+        factor = (1e7/nist.HARTREE2WAVENUMBER) / (nist.HBAR/nist.HARTREE2J*1e15)
+        efield *= np.exp(1j*time/f_lambda*factor)
         efield = np.real(efield)
 
-    factor = strength / (5.14220674763 * 1e11) # HARTREE2J / E_CHARGE / BOHR_SI
-    efield *= factor
+    # 5.14220674763 * 1e11
+    factor = nist.HARTREE2J / nist.E_CHARGE / nist.BOHR_SI
+    efield *= (strength / factor)
     #print_matrix('cubic grid efield:', efield0.T, 5)
 
     return coords, efield
