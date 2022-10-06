@@ -16,6 +16,7 @@ scf_convergence 8 ! 6
 $end
 
 $polariton
+cavity_mode   0.0 0.0 1 ! field strength
 !cavity_freq  0.25
 cavity_model  jc
 uniform_field 0

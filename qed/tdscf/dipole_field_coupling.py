@@ -32,7 +32,7 @@ def creat_mesh_grids(mol, mf, grid_type=1, nxyz=[80, 80, 80, 0.1, 6.0]):
     return ngrids, coords, weights
 
 
-def get_electric_field(file_name='efield', unit='nm', nline=2):
+def get_electric_field(file_name='efield', strength=1, unit='nm', nline=2, time=0):
     # read in efield on cubic grids
     data = np.loadtxt(file_name+'.txt', skiprows=nline) # skip the header lines
 
@@ -40,7 +40,17 @@ def get_electric_field(file_name='efield', unit='nm', nline=2):
     if unit == 'au': factor = 1.0 / lib.param.BOHR
     coords = data[:, :3] * factor
 
-    efield = data[:, 3:8:2] # take real part out of complex
+    efield = data[:, 3:8:2] # we can only handle real field now
+    if time > 0: # calculate efield at time t
+        efield += data[:, 4:9:2] * 1j
+
+        line = next(open(file_name, 'r'))
+        omega = float(line.split('lambda=')[1].split('nm')[0])
+        efield *= np.exp(1j*omega*time)
+        efield = np.real(efield)
+
+    factor = strength / (5.14220674763 * 1e11) # HARTREE2J / E_CHARGE / BOHR_SI
+    efield *= factor
     #print_matrix('cubic grid efield:', efield0.T, 5)
 
     return coords, efield
@@ -82,7 +92,7 @@ def dipole_dot_efield_on_grid(mol, mf, cav_obj):
 
     else:
         efield_file = cav_obj.efield_file
-        coords0, efield0 = get_electric_field(efield_file)
+        coords0, efield0 = get_electric_field(efield_file, np.max(cav_obj.cavity_mode))
 
         # get Lebedev grids
         ngrids, coords, weights = creat_mesh_grids(mol, mf, grid_type=1)
