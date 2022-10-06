@@ -32,7 +32,7 @@ def creat_mesh_grids(mol, mf, grid_type=1, nxyz=[80, 80, 80, 0.1, 6.0]):
     return ngrids, coords, weights
 
 
-def get_electric_field(file_name='efield', strength=1, unit='nm', nline=2):
+def get_electric_field(file_name='efield', strength=1, time=0, unit='nm', nline=2):
     from pyscf.data import nist
     # read in efield on cubic grids
     data = np.loadtxt(file_name+'.txt', skiprows=nline) # skip the header lines
@@ -97,7 +97,7 @@ def dipole_dot_efield_on_grid(mol, mf, cav_obj):
 
     else:
         efield_file = cav_obj.efield_file
-        coords0, efield0 = get_electric_field(efield_file, np.max(cav_obj.cavity_mode))
+        coords0, efield0 = get_electric_field(efield_file, cav_obj.field_strength, cav_obj.field_time)
 
         # get Lebedev grids
         ngrids, coords, weights = creat_mesh_grids(mol, mf, grid_type=1)

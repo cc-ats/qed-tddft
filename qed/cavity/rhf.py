@@ -21,6 +21,8 @@ class CavityModel(lib.StreamObject):
         self.cavity_num  = None
         self.uniform_field = True
         self.efield_file = 'efield'
+        self.field_strength = 1
+        self.field_time  = 0
         self._mol        = None
         self.ge_ov       = None
         self.amp_size    = None

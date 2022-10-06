@@ -216,13 +216,15 @@ def run_pyscf_dft_tddft(charge, spin, atom, basis, functional, td_model, nroots,
 
 #@print_durations()
 def run_pyscf_qed(mf, td, qed_model, cavity_model, cavity_mode, cavity_freq,
-                  nfrag=1, uniform_field=True, efield_file='efield', verbose=0, debug=0):
+                  nfrag=1, uniform_field=True, external_field=None, verbose=0, debug=0):
     num_cav = cavity_freq.size
     if nfrag == 1:
         cav_obj = getattr(qed, cavity_model)(mf, cavity_mode=cavity_mode,
                                              cavity_freq=cavity_freq)
         cav_obj.uniform_field = uniform_field
-        cav_obj.efield_file = efield_file
+        cav_obj.efield_file = external_field[0]
+        cav_obj.field_strength = external_field[1]
+        cav_obj.field_time = external_field[2]
         qed_td = getattr(qed, qed_model)(mf, cav_obj=cav_obj)
 
         qed_td.nroots = td.nroots + num_cav
@@ -311,6 +313,7 @@ def get_photon_info(photon_keys):
     cavity_model = 'JC'
     cavity_mode, cavity_freq = None, None
     uniform_field, efield_file = True, 'efield'
+    field_strength, field_time = 1, 0
 
     if 'cavity_model' in photon_keys: # support many models
         cavity_model = photon_keys.get('cavity_model')
@@ -328,6 +331,10 @@ def get_photon_info(photon_keys):
         uniform_field = bool(int(photon_keys.get('uniform_field')))
     if 'efield_file' in photon_keys:
         efield_file = photon_keys.get('efield_file')
+    if 'field_strength' in photon_keys:
+        field_strength = float(photon_keys.get('field_strength'))
+    if 'field_time' in photon_keys:
+        field_time = float(photon_keys.get('field_time'))
 
     if cavity_mode is None:
         if uniform_field:
@@ -345,7 +352,7 @@ def get_photon_info(photon_keys):
     print('cavity_mode: ', cavity_mode)
     print('cavity_freq: ', cavity_freq)
 
-    return qed_model, cavity_model, cavity_mode, cavity_freq, uniform_field, efield_file
+    return qed_model, cavity_model, cavity_mode, cavity_freq, uniform_field, [efield_file, field_strength, field_time]
 
 
 def justify_photon_info(td, nroots, nfrag, func='average', nwidth=10):
@@ -378,7 +385,7 @@ def run_pyscf_final(parameters):
                 for n in range(nfrag): td[n].nroots = nov
             else: td.nroots = nov
 
-        qed_model, cavity_model, cavity_mode, cavity_freq, uniform_field, efield_file = \
+        qed_model, cavity_model, cavity_mode, cavity_freq, uniform_field, external_field = \
                     get_photon_info(parameters.get(section_names[2]))
 
         if cavity_freq == None:
@@ -389,7 +396,7 @@ def run_pyscf_final(parameters):
         for i in range(len(cavity_model)):
             qed_td[i], cav_obj[i] = run_pyscf_qed(mf, td, qed_model, cavity_model[i],
                                                   cavity_mode, cavity_freq, nfrag,
-                                                  uniform_field, efield_file,
+                                                  uniform_field, external_field,
                                                   verbose, debug)
 
     final_print_energy(td, nwidth=10)
