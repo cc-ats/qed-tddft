@@ -32,6 +32,20 @@ for i, fname in enumerate(filelist):
 idx = numpy.argsort(Dangle)
 filelist = [filelist[i] for i in idx]
 
+'''
+#boson operator
+ two_p is: \sum_{01}w_{01}[b^{\dag}_0(nm)b_1(nm)]
+ one_p is: \sum_{0} G_{0} [b^{\dag}_0(nm) + b_0(nm)]
+  Fock matrix and matrix of normal modes are not assumed to be diagonal, 
+ even though they will usually be diagonal
+ i./e, w_{01} = 0, w_{00} is the vibrational mode (freq)
+
+ H = f_{pq} a^\dag_p a_q  : one electron part
+   + I_{pqsr} a^\dag_p a^\dag_q a_s a_r : two electron part
+   + g_{pq m} a^\dag_p a_q (b^\dag_m + b_m)
+   + \sum_{01}w_{01}[b^{\dag}_0(nm)b_1(nm)]
+'''
+
 for fname in filelist:
     print("\n-------------------------------------------------")
     print("------------- %s -------------" %fname)
@@ -80,7 +94,7 @@ for fname in filelist:
     mol.build()
     xc = 'b3lyp'
     nmode = 1
-    gfac = 0.000
+    gfac = 0.000 # start with zero, test different strengths
     omega = numpy.zeros(nmode)
     vec = numpy.zeros((nmode,3))
     omega[0] = 0.1 
