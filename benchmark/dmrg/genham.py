@@ -5,9 +5,9 @@ from pyscf import gto, scf, cc
 from time import time
 from qed.cc.abinit import Model
 
-
-NRoots = 10
-nfock_max = 1
+au2ev = 27.211386245988
+NRoots = 6
+nfock_max = 3
 
 # use os.listdir() to get the list of files and folders in the specified directory
 fd = "geo_trans"
@@ -36,7 +36,7 @@ filelist = [filelist[i] for i in idx]
 #boson operator
  two_p is: \sum_{01}w_{01}[b^{\dag}_0(nm)b_1(nm)]
  one_p is: \sum_{0} G_{0} [b^{\dag}_0(nm) + b_0(nm)]
-  Fock matrix and matrix of normal modes are not assumed to be diagonal, 
+  Fock matrix and matrix of normal modes are not assumed to be diagonal,
  even though they will usually be diagonal
  i./e, w_{01} = 0, w_{00} is the vibrational mode (freq)
 
@@ -45,6 +45,8 @@ filelist = [filelist[i] for i in idx]
    + g_{pq m} a^\dag_p a_q (b^\dag_m + b_m)
    + \sum_{01}w_{01}[b^{\dag}_0(nm)b_1(nm)]
 '''
+
+gen_integral = False
 
 for fname in filelist:
     print("\n-------------------------------------------------")
@@ -62,8 +64,9 @@ for fname in filelist:
 
     mol = gto.M(
         atom = atoms,
-        basis = '631g(d)',
-        unit = 'Angstrom', 
+        basis = 'sto3g',
+        #basis = '631g(d)',
+        unit = 'Angstrom',
         symmetry = True,
     )
 
@@ -74,7 +77,7 @@ for fname in filelist:
     #hf.polariton = True
     #hf.gcoup = 0.01
     mf = hf.run()
-    
+
     print('hf energy', Dangle[i],  mf.e_tot)
 
     '''
@@ -88,60 +91,82 @@ for fname in filelist:
     print('CCSD total energy', gstot)
     print('CCSD correlaiton energy', mycc.e_tot - mf.e_tot)
     '''
-    
-    print('\n===========  qed-ccsd calculation  ======================\n')
+
     method = 'uhf'
     mol.build()
     xc = 'b3lyp'
     nmode = 1
-    gfac = 0.000 # start with zero, test different strengths
     omega = numpy.zeros(nmode)
     vec = numpy.zeros((nmode,3))
-    omega[0] = 0.1 
-    vec[0,:] = [1.0, 1.0, 1.0]
-    
+    omega[0] = 3.0/au2ev
+    gfac = 1.e-2 # start with zero, test different strengths
+    vec[0,:] = [0.0, 0.0, 1.0]
+
     from qed.cc.eom_epcc import eom_ee_epccsd_1_s1
     from qed.cc.eom_epcc import eom_ee_epccsd_n_sn
     from qed.cc.polaritoncc import epcc, epcc_nfock
     from qed.cc.abinit import Model
-    
+
     mod = Model(mol, method, xc, omega, vec, gfac, shift=False)
-    
-    #--------------------------
-    # get Hamiltonian:
-    #--------------------------
-    # fock matrix
-    F = mod.g_fock()
-    eo = F.oo.diagonal()
-    ev = F.vv.diagonal()
-    
-    D1 = eo[:,None] - ev[None,:]
-    D2 = eo[:,None,None,None] + eo[None,:,None,None]\
-            - ev[None,None,:,None] - ev[None,None,None,:]
 
-    F.oo = F.oo - numpy.diag(eo)
-    F.vv = F.vv - numpy.diag(ev)
-    
-    # get HF energy
-    Ehf = mod.hf_energy()
-    
-    # get ERIs
-    I = mod.g_aint()
-    
-    # get normal mode energies
-    w = mod.omega()
-    np = w.shape[0]
-    D1p = eo[None,:,None] - ev[None,None,:] - w[:,None,None]
+    if gen_integral:
+        #--------------------------
+        # get Hamiltonian:
+        #--------------------------
+        # fock matrix
+        F = mod.g_fock()
+        eo = F.oo.diagonal()
+        ev = F.vv.diagonal()
 
-    # get elec-phon matrix elements
-    g,h = mod.gint()
-    G,H = mod.mfG()
+        D1 = eo[:,None] - ev[None,:]
+        D2 = eo[:,None,None,None] + eo[None,:,None,None]\
+                - ev[None,None,:,None] - ev[None,None,None,:]
 
-    del g, h, G, H, I, F
+        F.oo = F.oo - numpy.diag(eo)
+        F.vv = F.vv - numpy.diag(ev)
 
-    '''
-    options = {"ethresh":1e-7, 'tthresh':1e-6, 'max_iter':500, 'damp':0.4, 'nfock': 1}
-    ecc, e_cor, (T1,T2,S1,U11) = epcc(mod, options,ret=True)
-    print('correlation energy (epcc)=', ecc, e_cor)
-    '''
+        # get HF energy
+        Ehf = mod.hf_energy()
+
+        # get ERIs
+        I = mod.g_aint()
+
+        # get normal mode energies
+        w = mod.omega()
+        np = w.shape[0]
+        D1p = eo[None,:,None] - ev[None,None,:] - w[:,None,None]
+
+        # get elec-phon matrix elements
+        g,h = mod.gint()
+        G,H = mod.mfG()
+
+        del g, h, G, H, I, F
+
+    else:
+        # conventional CCSD calculation
+        hf = scf.HF(mol)
+        mf = hf.run()
+        print('hf energy',mf.hf_energy)
+        mycc = cc.CCSD(mf).run()
+        print('CCSD total energy', mycc.e_tot)
+        mycc.kernel()
+        pyscf_es, c_ee = mycc.eeccsd(nroots=NRoots)
+        e_singlets, c_singlets = mycc.eomee_ccsd_singlet(nroots=NRoots)
+
+        print('pyscf excited state energies =', pyscf_es)
+        print('\npyscf excited state energies (singlets) =', e_singlets)
+        print('\n=========== end of eom ccsd calculation  ================\n')
+
+        for nfock in range(1, nfock_max+1):
+            print(f'\n===========  qed-ccsd calculation  nfock={nfock}====================\n')
+            #options = {"ethresh":1e-7, 'tthresh':1e-6, 'max_iter':500, 'damp':0.4, 'nfock': nfock}
+            #ecc, e_cor, (T1,T2,S1,U11) = epcc(mod, options,ret=True)
+            options = {"ethresh":1e-7, 'tthresh':1e-7, 'max_iter':500, 'damp':0.4, 'nfock': nfock, 'nfock2':1, 'slow': False}
+            ecc, e_cor, (T1,T2,Sn,U1n) = epcc_nfock(mod, options,ret=True)
+            print(f'correlation energy {gfac:.4f} (epcc): {nfock} {ecc:.9f}  {e_cor:.9f}')
+
+            # exciton-polariton
+            options = {"nroots":NRoots, 'conv_tol':1e-7, 'max_cycle':500, 'max_space':1000, 'nfock': nfock, 'nfock2':1, 'slow': False}
+            es = eom_ee_epccsd_n_sn(mod, options, amps=(T1,T2,Sn,U1n), analysis=True)
+            print(f'excited state energies {nfock}  {", ".join(["%.9f" % value*au2ev for value in es[0]])}')
 

@@ -61,3 +61,17 @@ def RPA(mf_obj, cav_obj=None):
         return qed.tdscf.rhf.RPA(td_obj, cav_obj)
 
 TDDFT = RPA
+
+from  qed.scf import hf
+
+def HF(mol, xc=None, **kwargs):
+
+    if mol.nelectron == 1 or mol.spin == 0:
+        if xc is None:
+            return hf.RHF(mol, **kwargs)
+        else:
+            raise NotImplementedError
+    else:
+        raise NotImplementedError
+
+

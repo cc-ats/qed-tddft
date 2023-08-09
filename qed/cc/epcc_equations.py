@@ -363,6 +363,8 @@ def qed_ccsd_sn_u1n_opt(F, I, w, g, h, G, H, nfock1, nfock2, amps):
 
     T2A = T2old.copy()
     T1T1 = einsum('ai,bj->abij',T1old, T1old)
+    #print("test-zy:T1T1 has Nan?", numpy.isnan(T1T1).any())
+    #print("test-zy:T2A  has Nan?", numpy.isnan(T2A).any(), flush=True)
 
     T2A += 0.5*T1T1 #einsum('ai,bj->abij',T1old, T1old)
     T2A -= 0.5*einsum('bi,aj->abij',T1old, T1old)
@@ -509,9 +511,9 @@ def qed_ccsd_sn_u1n_opt(F, I, w, g, h, G, H, nfock1, nfock2, amps):
     #S1 += 1.0*einsum('I,I->I', w, S1old)
     #U11 += 1.0*einsum('I,Iai->Iai', w, U11old)
 
-    # end of copy 
+    # end of copy
     #-------------------------------------------------------------------------
-    
+
     np = w.shape[0]
     w2d = numpy.zeros((np,np))
     for k in range(np):
@@ -531,11 +533,11 @@ def qed_ccsd_sn_u1n_opt(F, I, w, g, h, G, H, nfock1, nfock2, amps):
         S2old = Snold[1]
         # S1
         Sn[0] += 1.0*einsum('Jia,ai,IJ->I', g.ov, T1old, S2old)
-        
+
         # S2
         Sn[1] = numpy.zeros((w.shape[0],w.shape[0]))
         S2 = Sn[1]
-        
+
         S2 += 1.0*einsum('IK,JK->IJ', w2d, S2old)
         S2 += 1.0*einsum('JK,IK->IJ', w2d, S2old)
 

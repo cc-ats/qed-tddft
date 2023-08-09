@@ -27,6 +27,7 @@ def getDsn(w, nfock):
 
     Dsn = [None] * nfock
     Dsn[0] = - w
+    """
     if nfock> 1:
         Dsn[1] = Dsn[0][...,None] - w[None,:]
     if nfock> 2:
@@ -37,7 +38,12 @@ def getDsn(w, nfock):
         Dsn[4] = Dsn[3][...,None] - w[None,None,None,None,:]
     if nfock> 5:
         Dsn[5] = Dsn[4][...,None] - w[None,None,None,None,None,:]
-    return Dsn 
+    """
+
+    for i in range(1, nfock):
+        Dsn[i] = Dsn[i-1][...,None] - numpy.expand_dims(w, axis=tuple(range(i)))
+
+    return Dsn
 
 def ccsd_pt2(model, options, iprint=0, ret=False):
     # orbital energies, denominators, and Fock matrix in spin-orbital basis
@@ -229,6 +235,17 @@ def epcc_nfock(model, options, iprint=1, ret=False,theory='polariton'):
     nfock = order of photon operator (b^\dag) in pure photonic excitaiton (T_p)
     nfock2= order of photon operator in coupled excitaiton T_ep
     """
+    nfock = options['nfock']
+    nfock2 = options['nfock2'] if 'nfock2' in options else 1
+
+    ethresh = options["ethresh"]
+    tthresh = options["tthresh"]
+    max_iter = options["max_iter"]
+    useslow = False
+    if 'slow' in options:
+        useslow = options['slow']
+
+    damp = options["damp"]
     # orbital energies, denominators, and Fock matrix in spin-orbital basis
     F = model.g_fock()
 
@@ -253,24 +270,38 @@ def epcc_nfock(model, options, iprint=1, ret=False,theory='polariton'):
     # get ERIs
     I = model.g_aint()
 
-    # get normal mode energies
-    w = model.omega()
-    np = w.shape[0]
+    w = None
+    g = None
+    if nfock > 0:
+        # if nfock <= 0, fall back to normal CCSD
+        # get normal mode energies
+        w = model.omega()
+        np = w.shape[0]
 
-    D1p = eo[None,:,None] - ev[None,None,:] - w[:,None,None]
-    np,no,nv = D1p.shape
+        D1p = eo[None,:,None] - ev[None,None,:] - w[:,None,None]
+        np,no,nv = D1p.shape
 
-    # get elec-phon matrix elements
-    g,h = model.gint()
-    G,H = model.mfG()
+        # get elec-phon matrix elements
+        g,h = model.gint()
+        G,H = model.mfG()
+        G = numpy.zeros(np)
+        H = numpy.zeros(np)
 
     # DIIS
-
     # build MP2 T,S,U amplitudes
-    T1old = F.vo/D1.transpose((1,0))
-    T2old = I.vvoo/D2.transpose((2,3,0,1))
-    S1old = -H/w
-    U11old = h.vo/D1p.transpose((0,2,1))
+    #T1old = F.vo/D1.transpose((1,0))
+    #T2old = I.vvoo/D2.transpose((2,3,0,1))
+    #S1old = -H/w
+    #U11old = h.vo/D1p.transpose((0,2,1))
+
+    T1old = numpy.zeros((nv, no))
+    T2old = numpy.zeros((nv, nv, no, no))
+    if nfock > 0:
+        S1old = numpy.zeros(np)
+        U11old = numpy.zeros((np, nv, no))
+
+    diis_T1 = [T1old.copy()]
+    diis_T2 = [T2old.copy()]
 
     Eold = 0.0
     Eccsd = epcc_energy.energy(T1old,T2old,S1old,U11old,F.ov,I.oovv,w,g.ov,G)
@@ -281,54 +312,40 @@ def epcc_nfock(model, options, iprint=1, ret=False,theory='polariton'):
     st1 = numpy.sqrt(T1old.size)
     st2 = numpy.sqrt(T2old.size)
 
+    Snold = None  # No if nfock<=0
+    U1nold = None #
+    if nfock > 0:
+        # ssn and su1n
+        ssn = [None] * nfock
+        su1n = [None] * nfock2
+        Snold = [None]*nfock
+        U1nold = [None]*nfock2
+
+        diis_sn = []
+        diis_un = []
+        for k in range(nfock):
+            if k == 0:
+                Snold[k] = numpy.zeros(np) #-H/w
+            else:
+                shape  = [np for j in range(k+1)]
+                #print('teset-zy: shape=', tuple(shape))
+                Snold[k] = numpy.zeros(tuple(shape))
+            ssn[k] = numpy.sqrt(Snold[k].size)
+            diis_sn.append(Snold[k].copy())
+
+        for k in range(nfock2):
+            if k == 0:
+                U1nold[k] =  numpy.zeros((np, nv, no)) #h.vo/D1p.transpose((0,2,1))
+            else:
+                shape  = [np for j in range(k+1)] + [nv, no]
+                U1nold[k] =  numpy.zeros(tuple(shape))
+            su1n[k] = numpy.sqrt(U1nold[k].size)
+            diis_un.append(U1nold[k].copy())
+
+        Dsn = getDsn(w, nfock)
+
+
     # coupled cluster iterations
-    ethresh = options["ethresh"]
-    tthresh = options["tthresh"]
-    max_iter = options["max_iter"]
-    nfock = options['nfock']
-    nfock2 = options['nfock2']
-    useslow = False
-    if 'slow' in options:
-        useslow = options['slow']
-
-    damp = options["damp"]
-    if nfock < 1:
-        print('nfock cannot be <1. It is changed to 1 instead!!!!')
-        nfock = 1
-
-    # ssn and su1n
-    ssn = [None] * nfock
-    su1n = [None] * nfock2
-
-    print('test-zy: nfock/2=', nfock, nfock2)
-
-    Snold = [None]*nfock
-    U1nold = [None]*nfock2
-    for k in range(nfock):
-        if k == 0: 
-            Snold[k] = -H/w
-        else:
-            shape  = [np for j in range(k+1)]
-            #print('teset-zy: shape=', tuple(shape))
-            Snold[k] = numpy.zeros(tuple(shape))
-        ssn[k] = numpy.sqrt(Snold[k].size)
-
-    for k in range(nfock2):
-        if k == 0:
-            U1nold[k] =  h.vo/D1p.transpose((0,2,1))
-        else:
-            shape  = [np for j in range(k+1)] + [nv, no]
-            U1nold[k] =  numpy.zeros(tuple(shape))
-        su1n[k] = numpy.sqrt(U1nold[k].size)
-
-    #Ds1 = -w[:]
-    #Ds2 = -w[:,None] - w[None,:]
-    Dsn = getDsn(w, nfock)
-
-    for k in range(nfock):
-        print('Dsn[%d]'%k, Dsn[k])
-
-
     converged = False
     istep = 0
     while istep < max_iter and not converged:
@@ -354,10 +371,11 @@ def epcc_nfock(model, options, iprint=1, ret=False,theory='polariton'):
 
         T1 /= D1.transpose((1,0))
         T2 /= D2.transpose((2,3,0,1))
+
         for k in range(nfock):
             #print('test-zy: sn', k, Sn[k])
-            #Sn[k] /= -w 
-            Sn[k] /= Dsn[k] # double check of higher order 
+            #Sn[k] /= -w
+            Sn[k] /= Dsn[k] # double check of higher order
 
         for k in range(nfock2):
             U1n[k] /= D1p.transpose((0,2,1)) # currently it only works for order 1
@@ -368,10 +386,9 @@ def epcc_nfock(model, options, iprint=1, ret=False,theory='polariton'):
         # res of sn
         for k in range(nfock):
             res += numpy.linalg.norm(Snold[k] - Sn[k])/ssn[k]
-
         # res of U1n
         for k in range(nfock2):
-            res += numpy.linalg.norm(U1nold[k] - U1n[k])/su1n[k] # 
+            res += numpy.linalg.norm(U1nold[k] - U1n[k])/su1n[k]
 
         # for diis
         #tmpvec = amplitudes_to_vector(T1, T2, Sn, U1n)
@@ -386,12 +403,13 @@ def epcc_nfock(model, options, iprint=1, ret=False,theory='polariton'):
                 Snold[k] = damp*Snold[k] + (1.0 - damp)*Sn[k]
             for k in range(nfock2):
                 U1nold[k] = damp*U1nold[k] + (1.0 - damp)*U1n[k]
-        
+
         # diis mixer (todo)
-        #T1old, T2old, Snold, U1nold = diis([T1old,T2old,Snold,U1nold], 
+        #T1old, T2old, Snold, U1nold = diis([T1old,T2old,Snold,U1nold],
         #        nfock1, nfock2, istep, normt, Eccsd - Eold, adiis)
 
         Eccsd = epcc_energy.energy(T1old,T2old,Snold[0],U1nold[0],F.ov,I.oovv,w,g.ov,G)
+        Eccsd = epcc_energy.energy(T1,T2,Sn[0],U1n[0],F.ov,I.oovv,w,g.ov,G)
 
         Ediff = abs(Eccsd - Eold)
         if iprint>0:

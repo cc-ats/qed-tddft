@@ -12,7 +12,7 @@ au_to_cm = 2.19475 * 1e5
 
 def make_mf(mol, method, xc=None, RUN=True):
     """construct a mean field object from the given molecule and specified method"""
-    #print("""construct a mean field object from the given molecule and specified method""", RUN,method)
+    print("""construct a mean field object from the given molecule and specified method""", RUN,method)
     if method == 'rhf':
         mf = scf.RHF(mol)
     elif method =='uhf':
@@ -89,6 +89,23 @@ def get_dmat(mol, method, xc, disp):
         dmat = mol.intor_symmetric('int1e_r', comp=3)
     return dmat
 
+def get_qmat(mol):
+    # | xx, xy, xz |
+    # | yx, yy, yz |
+    # | zx, zy, zz |
+    # xx <-> rrmat[0], xy <-> rrmat[3], xz <-> rrmat[6]
+    #                  yy <-> rrmat[4], yz <-> rrmat[7]
+    #                                   zz <-> rrmat[8]
+
+    qmat = None
+    rrmat = None
+    #r2mat = None
+    charges = mol.atom_charges()
+    coords  = mol.atom_coords()
+    charge_center = np.einsum('i,ix->x', charges, coords)
+    with mol.with_common_orig(charge_center):
+        qmat  = -mol.intor('int1e_rr')
+    return qmat
 class abinit(object):
     def __init__(self, mol, method, xc=None, omega=None, vec=None, gfac=0.0):
         self.mol = mol
@@ -102,6 +119,7 @@ class abinit(object):
         'convergence_dmax': 1e-4,  # Angstrom
         }
         self.dmat = None
+        self.qmat = None
         self.omega = omega
         self.vec = vec
         self.gfac = gfac
@@ -122,9 +140,11 @@ class abinit(object):
         return self.dmat
 
     def get_gmat(self):
-        if self.omega is None: 
+        if self.omega is None:
             print('warning, omega is not given')
         if self.dmat is None: self.get_dmat()
+        if self.qmat is None: self.qmat = get_qmat(self.mol)
+
         omega, vec, dmat = self.omega, self.vec, self.dmat
         nmode = len(omega)
 
@@ -133,10 +153,15 @@ class abinit(object):
             vec[i,:] = vec[i,:] / np.sqrt(np.dot(vec[i,:], vec[i,:]))
 
         nao, nmode = self.mol.nao_nr(), len(omega)
+
+        # Tensor:  <u|r_i * r_y> * v_x * v_y
+        x_out_y = 0.5* np.outer(vec, vec).reshape(-1)
+        self.qd2 = self.gfac * self.gfac * np.einsum("J, Juv->uv", x_out_y, self.qmat)
+
         gmat = np.empty((nmode, nao, nao))
         gmat = np.einsum('Jx,xuv->Juv', vec, dmat) * self.gfac
         #print('dmat=\n', dmat)
-        print('|gmat|=\n', np.linalg.norm(gmat))
+        #print('\n|gmat|=', np.linalg.norm(gmat))
 
         self.gmat = gmat
         return gmat
@@ -152,20 +177,24 @@ class Model(object):
         ca, cb : mo coefficent for EPH-CC reference
         '''
         self._mol = mol
+        self.verbose = mol.verbose
         self.method = method
         self.xc = xc
-        self.openshell = False
-        if method == 'uhf' or method == 'uks':
-            self.openshell = True
+        #self.openshell = False
+        #if method == 'uhf' or method == 'uks':
+        #    self.openshell = True
 
         self.abinit = abinit(mol, method, xc, omega, vec, gfac)
 
         self.abinit.kernel() # extracting Hamiltonian
         self.mol = self.abinit.mol #update to relaxed molecule
+        self.dmat = self.abinit.dmat
+
+        """
         self.nmo = self.mol.nao_nr()
         if self.openshell:
             self.nmo = 2*self.mol.nao_nr()
-        
+
         if self.openshell:
             if ca is None or cb is None:
                 mf = make_mf(self.mol, 'uhf')
@@ -175,7 +204,7 @@ class Model(object):
                 na, nb = int(mf.mo_occ[0].sum()), int(mf.mo_occ[1].sum())
                 self.na, self.nb = na, nb
                 self.mf = mf
-        
+
             self.ca, self.cb = ca, cb
             self.pa = np.einsum('ai,bi->ab',ca[:,:na],ca[:,:na])
             self.pb = np.einsum('ai,bi->ab',cb[:,:nb],cb[:,:nb])
@@ -192,18 +221,34 @@ class Model(object):
             self.ca = ca
             self.pa = 2.0*np.einsum('ai,bi->ab',ca[:,:na],ca[:,:na])
             self.ptot = self.pa
+        """
+        self.nmo = 2*self.mol.nao_nr()
+        if ca is None or cb is None:
+            mf = make_mf(self.mol, 'uhf')
+            ca, cb = mf.mo_coeff
+            na, nb = int(mf.mo_occ[0].sum()), int(mf.mo_occ[1].sum())
+            mf = make_mf(self.mol, 'rhf')
+            ca = cb = mf.mo_coeff
+            na = nb = int(mf.mo_occ.sum()) // 2
 
+            self.na, self.nb = na, nb
+            self.energy_nuc = mf.energy_nuc()
+        self.ca, self.cb = ca, cb
+        self.pa = np.einsum('ai,bi->ab',ca[:,:na],ca[:,:na])
+        self.pb = np.einsum('ai,bi->ab',cb[:,:nb],cb[:,:nb])
+        self.ptot = utils.block_diag(self.pa,self.pb)
         self.w = self.abinit.omega
         self.nmode = len(self.w)
         self.gmat = self.abinit.gmat #check this thing
-
+        gmatso = [utils.block_diag(self.gmat[i], self.gmat[i]) for i in range(len(self.gmat))]
+        """
         if self.openshell:
             gmatso = [utils.block_diag(self.gmat[i], self.gmat[i]) for i in range(len(self.gmat))]
         else:
             gmatso = [self.gmat[i] for i in range(len(self.gmat))]
+        """
         self.gmatso = np.asarray(gmatso)
         self.shift = shift
-
         if shift:
             self.xi = np.einsum('Iab,ab->I', self.gmatso, self.ptot) / self.w
             self.const = - np.einsum('I,I->',self.w,self.xi**2)
@@ -211,37 +256,41 @@ class Model(object):
     def tmat(self):
         """ Return T-matrix in the spin orbital basis."""
         t = self.mol.get_hcore()
-        if not self.openshell: return t
+        #if not self.openshell: return t
         return utils.block_diag(t,t)
 
     def fock(self):
         from pyscf import scf
-        if self.openshell:
-            if self.pa is None or self.pb is None:
-                raise Exception("Cannot build Fock without density ")
-        else:
-            if self.pa is None:
-                raise Exception("Cannot build Fock without density ")
-
+        if self.pa is None or self.pb is None:
+            raise Exception("Cannot build Fock without density ")
+        #if self.openshell:
+        #    if self.pa is None or self.pb is None:
+        #        raise Exception("Cannot build Fock without density ")
+        #else:
+        #    if self.pa is None:
+        #        raise Exception("Cannot build Fock without density ")
+        ptot = utils.block_diag(self.pa,self.pb)
         h1 = self.mol.get_hcore()
-        if self.openshell:
-            ptot = utils.block_diag(self.pa,self.pb)
-            h1 = utils.block_diag(h1,h1)
-            myhf = scf.GHF(self.mol)
-        else:
-            ptot = self.pa
-            myhf = scf.RHF(self.mol)
+        h1 = utils.block_diag(h1,h1)
+        myhf = scf.GHF(self.mol)
+        #if self.openshell:
+        #    ptot = utils.block_diag(self.pa,self.pb)
+        #    h1 = utils.block_diag(h1,h1)
+        #    myhf = scf.GHF(self.mol)
+        #else:
+        #    ptot = self.pa
+        #    myhf = scf.RHF(self.mol)
         fock = h1 + myhf.get_veff(self.mol, dm=ptot)
         return fock
 
     def hf_energy(self):
         F = self.fock()
         T = self.tmat()
-        if self.openshell:
-            ptot = utils.block_diag(self.pa,self.pb)
-        else:
-            ptot = self.pa
-
+        ptot = utils.block_diag(self.pa,self.pb)
+        #if self.openshell:
+        #    ptot = utils.block_diag(self.pa,self.pb)
+        #else:
+        #    ptot = self.pa
         Ehf = np.einsum('ij,ji->',ptot,F)
         Ehf += np.einsum('ij,ji->',ptot,T)
         if self.shift:
@@ -255,16 +304,20 @@ class Model(object):
         return numpy.concatenate((eo,eo)), numpy.concatenate((ev,ev))
 
     def g_fock(self):
-        if self.openshell:
-            na, nb = self.na, self.nb
-            va, vb = self.nmo//2 - na, self.nmo//2 - nb
-            Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
-            Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
-        else:
-            na = self.na
-            va = self.nmo - na
-            Co = self.ca[:,:na]
-            Cv = self.ca[:,na:]
+        na, nb = self.na, self.nb
+        va, vb = self.nmo//2 - na, self.nmo//2 - nb
+        Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
+        Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
+        #if self.openshell:
+        #    na, nb = self.na, self.nb
+        #    va, vb = self.nmo//2 - na, self.nmo//2 - nb
+        #    Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
+        #    Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
+        #else:
+        #    na = self.na
+        #    va = self.nmo - na
+        #    Co = self.ca[:,:na]
+        #    Cv = self.ca[:,na:]
 
         #print('entering fock')
         F = self.fock()
@@ -282,28 +335,34 @@ class Model(object):
 
     def g_aint(self):
         from pyscf import ao2mo
+        na, nb = self.na, self.nb
+        va, vb = self.nmo//2 - na, self.nmo//2 - nb
+        nao = self.nmo//2
+        C = np.hstack((self.ca, self.cb))
 
-        if self.openshell:
-            na, nb = self.na, self.nb
-            va, vb = self.nmo//2 - na, self.nmo//2 - nb
-            nao = self.nmo//2
-            C = np.hstack((self.ca, self.cb))
-        else:
-            na = self.na
-            va = self.nmo - na
-            nao = self.nmo
-            C = self.ca
+        #if self.openshell:
+        #    na, nb = self.na, self.nb
+        #    va, vb = self.nmo//2 - na, self.nmo//2 - nb
+        #    nao = self.nmo//2
+        #    C = np.hstack((self.ca, self.cb))
+        #else:
+        #    na = self.na
+        #    va = self.nmo - na
+        #    nao = self.nmo
+        #    C = self.ca
 
         eri = ao2mo.general(self.mol, [C,]*4, compact=False).reshape([self.nmo,]*4)
         eri[:nao,nao:] = eri[nao:,:nao] = eri[:,:,:nao,nao:] = eri[:,:,nao:,:nao] = 0
         Ua_mo = eri.transpose(0,2,1,3) - eri.transpose(0,2,3,1)
         temp = [i for i in range(self.nmo)]
-        if self.openshell:
-            oidx = temp[:na] + temp[self.nmo//2:self.nmo//2 + nb]
-            vidx = temp[na:self.nmo//2] + temp[self.nmo//2 + nb:]
-        else:
-            oidx = temp[:na]
-            vidx = temp[na:self.nmo]
+        oidx = temp[:na] + temp[self.nmo//2:self.nmo//2 + nb]
+        vidx = temp[na:self.nmo//2] + temp[self.nmo//2 + nb:]
+        #if self.openshell:
+        #    oidx = temp[:na] + temp[self.nmo//2:self.nmo//2 + nb]
+        #    vidx = temp[na:self.nmo//2] + temp[self.nmo//2 + nb:]
+        #else:
+        #    oidx = temp[:na]
+        #    vidx = temp[na:self.nmo]
 
         vvvv = Ua_mo[np.ix_(vidx,vidx,vidx,vidx)]
         vvvo = Ua_mo[np.ix_(vidx,vidx,vidx,oidx)]
@@ -336,11 +395,11 @@ class Model(object):
         return self.w
 
     def mfG(self):
-        if self.openshell:
-            ptot = utils.block_diag(self.pa,self.pb)
-        else:
-            ptot = self.pa
-
+        ptot = utils.block_diag(self.pa,self.pb)
+        #if self.openshell:
+        #    ptot = utils.block_diag(self.pa,self.pb)
+        #else:
+        #    ptot = self.pa
         g = self.gmatso
         if self.shift:
             mfG = np.zeros(self.nmode)
@@ -351,22 +410,22 @@ class Model(object):
     def gint(self):
         g = self.gmatso.copy()
         na = self.na
-        if self.openshell:
-            nb = self.nb
-            Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
-            Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
-        else:
-            Co = self.ca[:,:na]
-            Cv = self.ca[:,na:]
+        nb = self.nb
+        Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
+        Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
+
+        #if self.openshell:
+        #    nb = self.nb
+        #    Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
+        #    Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
+        #else:
+        #    Co = self.ca[:,:na]
+        #    Cv = self.ca[:,na:]
 
         oo = np.einsum('Ipq,pi,qj->Iij',g,Co,Co)
         ov = np.einsum('Ipq,pi,qa->Iia',g,Co,Cv)
         vo = np.einsum('Ipq,pa,qi->Iai',g,Cv,Co)
         vv = np.einsum('Ipq,pa,qb->Iab',g,Cv,Cv)
-        print('|g.oo|=', np.linalg.norm(oo))
-        print('|g.ov|=', np.linalg.norm(ov))
-        print('|g.vo|=', np.linalg.norm(vo))
-        print('|g.vv|=', np.linalg.norm(vv))
         g = one_e_blocks(oo,ov,vo,vv)
         return (g,g)
 
