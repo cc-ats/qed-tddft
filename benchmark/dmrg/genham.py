@@ -92,7 +92,7 @@ for fname in filelist:
     print('CCSD correlaiton energy', mycc.e_tot - mf.e_tot)
     '''
 
-    method = 'uhf'
+    method = 'rhf'
     mol.build()
     xc = 'b3lyp'
     nmode = 1

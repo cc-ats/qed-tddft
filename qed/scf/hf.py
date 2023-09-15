@@ -553,7 +553,7 @@ if __name__ == "__main__":
 
     print("\n=========== QED-HF calculation  ======================\n")
 
-    from pyscf.polariton import polaritonhf as qedhf
+    from qed.scf import hf as qedhf
 
     nmode = 1
     cavity_freq = numpy.zeros(nmode)

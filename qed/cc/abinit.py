@@ -106,6 +106,7 @@ def get_qmat(mol):
     with mol.with_common_orig(charge_center):
         qmat  = -mol.intor('int1e_rr')
     return qmat
+
 class abinit(object):
     def __init__(self, mol, method, xc=None, omega=None, vec=None, gfac=0.0):
         self.mol = mol
@@ -151,6 +152,7 @@ class abinit(object):
         # normalize vec
         for i in range(nmode):
             vec[i,:] = vec[i,:] / np.sqrt(np.dot(vec[i,:], vec[i,:]))
+        self.vec = vec
 
         nao, nmode = self.mol.nao_nr(), len(omega)
 
@@ -256,30 +258,16 @@ class Model(object):
     def tmat(self):
         """ Return T-matrix in the spin orbital basis."""
         t = self.mol.get_hcore()
-        #if not self.openshell: return t
         return utils.block_diag(t,t)
 
     def fock(self):
         from pyscf import scf
         if self.pa is None or self.pb is None:
             raise Exception("Cannot build Fock without density ")
-        #if self.openshell:
-        #    if self.pa is None or self.pb is None:
-        #        raise Exception("Cannot build Fock without density ")
-        #else:
-        #    if self.pa is None:
-        #        raise Exception("Cannot build Fock without density ")
-        ptot = utils.block_diag(self.pa,self.pb)
         h1 = self.mol.get_hcore()
+        ptot = utils.block_diag(self.pa,self.pb)
         h1 = utils.block_diag(h1,h1)
         myhf = scf.GHF(self.mol)
-        #if self.openshell:
-        #    ptot = utils.block_diag(self.pa,self.pb)
-        #    h1 = utils.block_diag(h1,h1)
-        #    myhf = scf.GHF(self.mol)
-        #else:
-        #    ptot = self.pa
-        #    myhf = scf.RHF(self.mol)
         fock = h1 + myhf.get_veff(self.mol, dm=ptot)
         return fock
 
@@ -287,10 +275,6 @@ class Model(object):
         F = self.fock()
         T = self.tmat()
         ptot = utils.block_diag(self.pa,self.pb)
-        #if self.openshell:
-        #    ptot = utils.block_diag(self.pa,self.pb)
-        #else:
-        #    ptot = self.pa
         Ehf = np.einsum('ij,ji->',ptot,F)
         Ehf += np.einsum('ij,ji->',ptot,T)
         if self.shift:
@@ -308,17 +292,6 @@ class Model(object):
         va, vb = self.nmo//2 - na, self.nmo//2 - nb
         Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
         Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
-        #if self.openshell:
-        #    na, nb = self.na, self.nb
-        #    va, vb = self.nmo//2 - na, self.nmo//2 - nb
-        #    Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
-        #    Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
-        #else:
-        #    na = self.na
-        #    va = self.nmo - na
-        #    Co = self.ca[:,:na]
-        #    Cv = self.ca[:,na:]
-
         #print('entering fock')
         F = self.fock()
         if self.shift:
@@ -339,30 +312,12 @@ class Model(object):
         va, vb = self.nmo//2 - na, self.nmo//2 - nb
         nao = self.nmo//2
         C = np.hstack((self.ca, self.cb))
-
-        #if self.openshell:
-        #    na, nb = self.na, self.nb
-        #    va, vb = self.nmo//2 - na, self.nmo//2 - nb
-        #    nao = self.nmo//2
-        #    C = np.hstack((self.ca, self.cb))
-        #else:
-        #    na = self.na
-        #    va = self.nmo - na
-        #    nao = self.nmo
-        #    C = self.ca
-
         eri = ao2mo.general(self.mol, [C,]*4, compact=False).reshape([self.nmo,]*4)
         eri[:nao,nao:] = eri[nao:,:nao] = eri[:,:,:nao,nao:] = eri[:,:,nao:,:nao] = 0
         Ua_mo = eri.transpose(0,2,1,3) - eri.transpose(0,2,3,1)
         temp = [i for i in range(self.nmo)]
         oidx = temp[:na] + temp[self.nmo//2:self.nmo//2 + nb]
         vidx = temp[na:self.nmo//2] + temp[self.nmo//2 + nb:]
-        #if self.openshell:
-        #    oidx = temp[:na] + temp[self.nmo//2:self.nmo//2 + nb]
-        #    vidx = temp[na:self.nmo//2] + temp[self.nmo//2 + nb:]
-        #else:
-        #    oidx = temp[:na]
-        #    vidx = temp[na:self.nmo]
 
         vvvv = Ua_mo[np.ix_(vidx,vidx,vidx,vidx)]
         vvvo = Ua_mo[np.ix_(vidx,vidx,vidx,oidx)]
@@ -396,10 +351,6 @@ class Model(object):
 
     def mfG(self):
         ptot = utils.block_diag(self.pa,self.pb)
-        #if self.openshell:
-        #    ptot = utils.block_diag(self.pa,self.pb)
-        #else:
-        #    ptot = self.pa
         g = self.gmatso
         if self.shift:
             mfG = np.zeros(self.nmode)
@@ -413,14 +364,6 @@ class Model(object):
         nb = self.nb
         Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
         Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
-
-        #if self.openshell:
-        #    nb = self.nb
-        #    Co = utils.block_diag(self.ca[:,:na],self.cb[:,:nb])
-        #    Cv = utils.block_diag(self.ca[:,na:],self.cb[:,nb:])
-        #else:
-        #    Co = self.ca[:,:na]
-        #    Cv = self.ca[:,na:]
 
         oo = np.einsum('Ipq,pi,qj->Iij',g,Co,Co)
         ov = np.einsum('Ipq,pi,qa->Iia',g,Co,Cv)
