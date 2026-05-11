@@ -2,8 +2,10 @@ import os, sys, time
 import numpy
 from pyscf import scf, tdscf, gto, lib
 
-from wavefunction_analysis.utils import print_matrix
-from wavefunction_analysis.utils.pyscf_parser import *
+import qed
+from qed.utils import print_matrix
+from qed.utils.pyscf_helper import *
+
 from qed.tdscf.ghf import FewLevel
 
 import functools
@@ -47,6 +49,8 @@ def run_ab_initio_qed(qed_method, mf, td, cav_obj, cavity_model, key, amp0=None)
     f_rotation = qed_obj.rotation_strength()
     print_energy_weight_dip_oscillator(energy, weight_p, trans_dip, f_oscillator, mag_dip, f_rotation)
 
+    print_matrix('State IPR: ', qed_obj.ipr, 10)
+
     if key.get('debug', 0) > 10:
         print_matrix('td-qed amplitudes', qed_obj.xy[0][0])
 
@@ -57,17 +61,17 @@ def collective_polariton(parameters, job_type=None):
     process_clock, perf_counter = time.process_time, time.perf_counter
     cpu0, wall0 = process_clock(), perf_counter()
 
-    nfrag, charge, spin, atom = parameters.get(section_names[0])[:4]
-    functional, basis, nroots, td_model, verbose, debug, scf_method \
-                        = get_rem_info(parameters.get(section_names[1]))
+    mol_param = parameters.get(section_names[0], {})
+    rem_param = parameters.get(section_names[1], {})
+    unit = rem_param.get('unit', 'angstrom')
+    molecular_system = setup_molecules(mol_param, unit)
+    molecules = molecular_system.molecules
+    scf_input = setup_scf_input(rem_param)
+    td_input = setup_td_input(rem_param)
 
-    #if 'few_level' in job_type: nroots = 80
-    #elif key.get('iguess', None) == 'qed': nroots = 0
-
-    h = None
-    mol, mf, etot, td = run_pyscf_dft_tddft(charge, spin, atom, basis, functional,
-                                      td_model, nroots, nfrag, verbose, debug,
-                                      h, scf_method)
+    nfrag = len(molecules)
+    nroots = td_input.cis_n_roots
+    mol, mf, etot, td = run_pyscf_dft_tddft(molecules, scf_input, td_input)
 
     print('ground-state energy:', numpy.array(etot))
     if nroots > 0:

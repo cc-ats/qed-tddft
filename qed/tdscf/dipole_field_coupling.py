@@ -8,8 +8,8 @@ from pyscf import lib
 from pyscf.dft import numint
 from pyscf.tools import cubegen
 
-from wavefunction_analysis.utils import print_matrix
-from wavefunction_analysis.utils.pyscf_parser import *
+from qed.utils import print_matrix
+from qed.utils.pyscf_helper import *
 
 
 def creat_mesh_grids(mol, grids, grid_type=1, nxyz=[80, 80, 80, 0.1, 6.0]):

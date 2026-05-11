@@ -393,7 +393,10 @@ class TDMixin(lib.StreamObject):
 
         dip_ov = self.cav_obj.dip_ov
         trans_dip = numpy.einsum('xl,pl->px', dip_ov, xys)
-        return trans_dip
+        #return trans_dip
+
+        ipr = numpy.einsum('pl,pl,pl,pl->p',xys,xys,xys,xys)
+        return trans_dip, ipr
 
     def transition_magnetic_dipole(self, amps):
         xys, _ = self.get_elec_amps(numpy.copy(amps), hermi=-1.)
@@ -649,7 +652,7 @@ class TDASym(TDMixin):
         self.xy = self.get_xys(amps) # For alpha beta spin
         self.mn = cav_obj.get_mns(amps)
 
-        self.trans_dip = self.transition_dipole(amps)
+        self.trans_dip, self.ipr = self.transition_dipole(amps)
         self.trans_mag_dip = self.transition_magnetic_dipole(amps)
 
         if self.chkfile:
@@ -880,6 +883,8 @@ def few_level_matrix(td_obj, cav_obj, has_dse, has_k=True, nstates=None,
             d = get_dse_block2(xs, dip_ov[:,n0:n1], dip_oo[n], dip_vv[n],
                                occupation[n], has_k=has_k)
             matrix[n*nstates:(n+1)*nstates, n*nstates:(n+1)*nstates] += d
+
+    amplitude = numpy.asarray(amplitude) # convert list to array for safety
 
     if has_offdiag:
         orbo, orbv = cav_obj.orbo, cav_obj.orbv
