@@ -169,6 +169,7 @@ def collective_polariton(parameters, job_type=None):
                 qed_obj.cavity_model = cavity_model
 
                 qed_obj.save_amplitude = qed_obj.resonance_state
+                if td_input.method != 'TDA': qed_obj.save_amplitude = False
                 if n<qed_obj.resonance_state: n = qed_obj.resonance_state
                 if n>nroots: break
 

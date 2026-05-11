@@ -13,10 +13,12 @@ git clone git@github.com:cc-ats/qed-tddft.git $QED_TDDFT_DIR_NAME
 cd $QED_TDDFT_DIR_NAME
 export PYTHONPATH=$(pwd):$PYTHONPATH
 cd examples
-python 01-qed-tddft.py 
+python 01-qed-tddft.py
 ```
 
-## Example
+## Examples
+
+### Example 1: Python API
 ```
 import numpy
 from pyscf import gto, scf, tdscf
@@ -46,6 +48,29 @@ cav_model = qed.PF(mf, cavity_mode=cavity_mode, cavity_freq=cavity_freq)
 td        = qed.TDDFT(mf, cav_obj=cav_model)
 td.nroots = 5
 td.kernel()
+```
+
+### Example 2: Input-file driver
+Run the collective polariton driver with the provided QED-TDDFT input file:
+```
+python qed/tdscf/collective_polariton.py examples/03-qed-tddft.in
+```
+
+The optional positional arguments are:
+```
+python qed/tdscf/collective_polariton.py INPUT [cavity_model] [coupling] [cavity_freq_or_adjust_func] [job_type]
+```
+
+For example:
+```
+# Jaynes-Cummings model with x-polarized coupling strength 0.001
+python qed/tdscf/collective_polariton.py examples/03-qed-tddft.in jc 0.001
+
+# Pauli-Fierz model with y-polarized coupling strength 0.010 and fixed cavity frequency
+python qed/tdscf/collective_polariton.py examples/03-qed-tddft.in pf 0.010-y 0.1483
+
+# Run all cavity models with average-adjusted cavity frequency and ab initio QED-TDDFT
+python qed/tdscf/collective_polariton.py examples/03-qed-tddft.in all 0.1 average ab_initio
 ```
 
 ## References
