@@ -70,7 +70,7 @@ def get_dse_block(cav_obj, rpa=False, has_k=True):
     dip_vv = cav_obj.dip_scaled_vv
     dse_block = numpy.einsum('pm,pn->mn', dip_ov.conj(), dip_ov)
 
-    if has_k is False:
+    if not has_k:
         if rpa:
             return numpy.array([dse_block, dse_block])
         else:
@@ -89,7 +89,7 @@ def get_dse_block(cav_obj, rpa=False, has_k=True):
 
         # k-type
         tmp2 = numpy.einsum('pab,pji->iajb', dvv, doo)
-        dse_block -= tmp1.reshape(-1, n1-n0) / occupation[n]
+        dse_block -= tmp2.reshape(-1, n1-n0) / occupation[n]
 
         if rpa:
             nocc, nvir = doo.shape[1], dvv.shape[1]
@@ -107,7 +107,7 @@ def get_dse_block2(xs, dip_ov, dip_oo, dip_vv, occupation, rpa=False, has_k=True
     dip = numpy.einsum('sm,pm->ps', xs, dip_ov)
     dse_block = numpy.einsum('ps,pt->st', dip.conj(), dip)
 
-    if has_k is False:
+    if not has_k:
         if rpa:
             return numpy.array([dse_block, dse_block])
         else:
@@ -223,7 +223,7 @@ class TDMixin(lib.StreamObject):
     singlet     = getattr(__config__, 'tdscf_rhf_TDA_singlet',   None)
     lindep      = getattr(__config__, 'tdscf_rhf_TDA_lindep',   1e-12)
     level_shift = getattr(__config__, 'tdscf_rhf_TDA_level_shift',  0)
-    #max_space   = getattr(__config__, 'tdscf_rhf_TDA_max_space',  200)
+    max_space   = getattr(__config__, 'tdscf_rhf_TDA_max_space',  200)
     max_cycle   = getattr(__config__, 'tdscf_rhf_TDA_max_cycle',  500)
 
     def __init__(self, td_obj, cav_obj, key):
@@ -316,7 +316,7 @@ class TDMixin(lib.StreamObject):
         log.info('conv_tol         = %g', self.conv_tol)
         log.info('eigh lindep      = %g', self.lindep)
         log.info('eigh level_shift = %g', self.level_shift)
-        #log.info('eigh max_space   = %d', self.max_space)
+        log.info('eigh max_space   = %d', self.max_space)
         log.info('eigh max_cycle   = %d', self.max_cycle)
         log.info('chkfile          = %s', self.chkfile)
         log.info('max_memory %d MB (current use %d MB)',
@@ -515,7 +515,7 @@ class TDASym(TDMixin):
 
         vind0, hdiag = [None]*nfrag, [None]*nfrag
         for n in range(nfrag):
-            print('td_obj:', td_obj[n].singlet, td_obj[n].wfnsym)
+            #print('td_obj:', td_obj[n].singlet, td_obj[n].wfnsym)
             #td_obj[n].singlet = self.singlet
             #td_obj[n].wfnsym  = self.wfnsym
             vind0[n], hdiag[n] = td_obj[n].gen_vind()
@@ -534,7 +534,7 @@ class TDASym(TDMixin):
                 resp += dse_resp[0]
             return resp
 
-        return vind, hdiag
+        return vind, numpy.asarray(hdiag)
 
     def get_elec_amps(self, amps, hermi=1.):
         xs = amps[:, :self.cav_obj.accum_nov[-1]] # pointer
@@ -628,8 +628,8 @@ class TDASym(TDMixin):
                               #tol_residual=self.conv_tol,
                               nroots=nstates, lindep=self.lindep,
                               max_cycle=self.max_cycle,
-                              #max_space=self.max_space,
-                              #max_memory=self.max_memory,
+                              max_space=self.max_space,
+                              max_memory=self.max_memory,
                               pick=pickeig, verbose=log)
 
         # 1/sqrt(2) because self.x is for alpha excitation amplitude and 2(X^+*X) = 1
@@ -716,7 +716,7 @@ class RPA(TDANoSym):
         accum_nov    = cav_obj.accum_nov
         dip_ov       = cav_obj.dip_scaled_ov.conj()
 
-        amp_size  = 2* accum_nov[-1]
+        amp_size  = accum_nov[-1]
 
         vind0, hdiag = [None]*nfrag, [None]*nfrag
         for n in range(nfrag):
@@ -727,27 +727,25 @@ class RPA(TDANoSym):
         def vind(xys, ls, dse_resp=None):
             #xys     = numpy.asarray(xys).reshape(-1, 2, nocc, nvir)
             amp_num = xys.shape[0]
-            abxys   = numpy.zeros((amp_num, amp_size))
-            print('zheng amp_num:', amp_num, 'amp_size:', amp_size, xys.shape, self.nstates)
+            abxys   = numpy.zeros((amp_num, 2, amp_size))
             for n in range(nfrag):
                 n0, n1 = accum_nov[n], accum_nov[n+1]
-                print('zheng ab matrix:', vind0[n](xys[:,:,n0:n1]).shape)
-                abxys[:,2*n0:2*n1] += vind0[n](xys[:,:,n0:n1])
+                _abxy = vind0[n](xys[:,:,n0:n1])
+                abxys[:, :, n0:n1] += _abxy.reshape(amp_num, 2, -1)
 
-            abxys1, abxys2 = abxys.reshape(amp_num, 2, -1).transpose(1,0,2)
+            abxys1, abxys2 = abxys.transpose(1,0,2)
             tmp1 = numpy.einsum('lp,p->lp', ls, cavity_freq2)
             gls  = numpy.einsum('pn,lp->ln', dip_ov, tmp1)
 
             abxys1 = (abxys1 + gls)
             abxys2 = (abxys2 - gls)
-            print('zheng abxys:', numpy.hstack([abxys1, abxys2]).shape)
 
             if isinstance(dse_resp, numpy.ndarray):
                 abxys1 += dse_resp[0]
                 abxys2 -= dse_resp[1]
             return numpy.hstack([abxys1, abxys2])#.reshape(amp_num, -1)
 
-        return vind, hdiag
+        return vind, numpy.asarray(hdiag)
 
     def get_elec_amps(self, amps, hermi=1.):
         amp_size = self.cav_obj.accum_nov[-1]
@@ -756,7 +754,7 @@ class RPA(TDANoSym):
         return xs + hermi* ys, xys
 
     def get_xys(self, amps):
-        _, xys2 = self.get_elec_amps(amps, fac=True)
+        _, xys2 = self.get_elec_amps(amps)
         xys = numpy.copy(xys2) # prevent changing amps
 
         # scale RHF amplitudes
@@ -770,18 +768,19 @@ class RPA(TDANoSym):
 
     def get_xys_weight(self, xys=None):#, fac=1.0):
         if xys == None: xys = self.xy
+        xys = numpy.asarray(xys)
 
         occupation = self.cav_obj.elec_occupation
         accum_nov = self.cav_obj.accum_nov
 
-        weight = []
-        for j in range(len(xys)):
-            x, y = xys[j]
-            for n in range(self.nfrag):
-                n0, n1 = accum_nov[n], accum_nov[n+1]
-                w = numpy.einsum('i,i->', x[n0:n1].conj(), x[n0:n1]) - numpy.einsum('i,i->', y[n0:n1].conj(), y[n0:n1])
-                weight.append(w*occupation[n])
-        return numpy.reshape(weight, (len(xys), -1)).T
+        weight = numpy.zeros((self.nfrag, xys.shape[0]))
+        for n in range(self.nfrag):
+            n0, n1 = accum_nov[n], accum_nov[n+1]
+            x, y = xys[:,0,n0:n1], xys[:,1,n0:n1]
+            w = numpy.einsum('ki,ki->k', x.conj(), x) - numpy.einsum('ki,ki->k', y.conj(), y)
+            weight[n] = w*occupation[n]
+        #return numpy.reshape(weight, (len(xys), -1)).T
+        return weight
 
     def get_norms2(self, xys):
         amp_size = self.cav_obj.accum_nov[-1]
@@ -804,20 +803,20 @@ class RPA(TDANoSym):
         if self.td_obj[0].xy and s > 0: # normal td_obj has excited state eigenvectors
             s = self.resonance_state-1
             accum_nov = self.cav_obj.accum_nov
-            td_x0 = numpy.zeros((nfrag, accum_nov[-1]*2))
+            td_x0 = numpy.zeros((nfrag, 2, accum_nov[-1]))
             for n in range(nfrag):
                 x0, y0 = self.td_obj[n].xy[s]
                 n0, n1 = accum_nov[n], accum_nov[n+1]
-                td_x0[n,n0:n1] = x0.ravel()
-                td_x0[n,n1:2*n1-n0] = y0.ravel()
+                td_x0[n,0,n0:n1] = x0.ravel()
+                td_x0[n,1,n0:n1] = y0.ravel()
 
-            return td_x0
+            return td_x0.reshape(nfrag, -1)
 
         else:
             x0 = init_guess(self.cav_obj.e_ia, nstates=nstates,
                             resonance_state=(self.resonance_state-1)*nfrag)
             y0 = numpy.zeros_like(x0)
-            return numpy.block([[x0, y0], [y0, x0.conj()]])
+            return numpy.hstack((x0, y0))
 
 
 def few_level_matrix(td_obj, cav_obj, has_dse, has_k=True, nstates=None,

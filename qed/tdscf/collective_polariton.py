@@ -75,11 +75,11 @@ def collective_polariton(parameters, job_type=None):
 
     print('ground-state energy:', numpy.array(etot))
     if nroots > 0:
-        final_print_energy(td, 'tddft', 10, 1)
+        final_print_energy(td, td_input.method, 10, 1)
         trans_dip, trans_mag_dip, _ = find_transition_dipole(td, nroots, nfrag)
         f_oscillator, f_rotation = find_oscillator_strength(td, nroots, nfrag)
-        print_matrix('tddft oscillator strength', f_oscillator, 10)
-        print_matrix('tddft rotation strength', f_rotation, 10)
+        print_matrix(td_input.method+' oscillator strength', f_oscillator, 10)
+        print_matrix(td_input.method+' rotation strength', f_rotation, 10)
 
     if 'polariton' not in parameters:
         return None, None

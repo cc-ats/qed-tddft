@@ -307,7 +307,7 @@ class RestrictedPauliFierz(RestrictedCavityModel, PauliFierz):
             tmp1     =  numpy.einsum('ln,pn->lp', zs, dip_ov)
             delta_zs =  numpy.einsum('pn,lp->ln', dip_ov.conj(), tmp1) # j-type
 
-            if self.has_k is False:
+            if not self.has_k:
                 return numpy.array([delta_zs, delta_zs])
 
             delta_z2 = numpy.copy(delta_zs)

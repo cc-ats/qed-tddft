@@ -146,12 +146,14 @@ def setup_scf_input(parameters):
 def setup_td_input(parameters):
     r"""Setup TDInput class from input parameters."""
     parameters = parameters.get(section_names[1], parameters)
+    rpa = parameters.get('rpa', 1)
+    td_model = 'TDDFT' if rpa == 2 else 'TDA'
     return TDInput(
-        method=parameters.get('td_model', 'TDA'),
+        method=td_model,
         cis_n_roots=parameters.get('cis_n_roots', 0),
         cis_singlets=parameters.get('cis_singlets', False),
         cis_triplets=parameters.get('cis_triplets', False),
-        rpa=parameters.get('rpa', False)
+        rpa=rpa,
     )
 
 
