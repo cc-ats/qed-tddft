@@ -46,8 +46,21 @@ def TDA(mf_obj, td_obj, cav_obj, key):
         else:
             return TDANoSym(td_obj, cav_obj, key)
 
+def _as_list(obj):
+    return obj if isinstance(obj, (list, tuple)) else [obj]
+
+def _is_pure_dft(mf):
+    return (hasattr(mf, 'xc') and hasattr(mf, '_numint') and
+            not mf._numint.libxc.is_hybrid_xc(mf.xc))
+
 def RPA(mf_obj, td_obj, cav_obj, key):
-    if isinstance(mf_obj, scf.uhf.UHF):
+    # Pure DFT TDDFT uses PySCF's reduced Casida form, not the full X/Y QED-RPA equations.
+    if any(_is_pure_dft(mf) for mf in _as_list(mf_obj)):
+        raise NotImplementedError(
+            'QED-TDDFT/RPA with pure DFT functionals is not supported; '
+            'use QED-TDA or a hybrid/HF functional.')
+
+    if any(isinstance(mf, scf.uhf.UHF) for mf in _as_list(mf_obj)):
         raise NotImplementedError
     else:
         #mf_obj = scf.addons.convert_to_rhf(mf_obj)
